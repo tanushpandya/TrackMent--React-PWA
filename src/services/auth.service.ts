@@ -5,7 +5,18 @@ export class AuthService {
   static isAllowedEmail(email?: string | null): boolean {
     if (!email) return false;
     const lower = email.toLowerCase().trim();
-    return lower.endsWith(`@${STUDENT_DOMAIN}`) || lower.endsWith(`@${FACULTY_DOMAIN}`);
+    if (lower.endsWith(`@${STUDENT_DOMAIN}`) || lower.endsWith(`@${FACULTY_DOMAIN}`)) {
+      return true;
+    }
+    // Allow preview deployments & localhost for testing
+    if (typeof window !== 'undefined' && (
+      window.location.hostname.includes('vercel.app') ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    )) {
+      return true;
+    }
+    return false;
   }
 
   static detectEmailRole(email?: string | null): 'STUDENT' | 'MENTOR' {
@@ -49,21 +60,25 @@ export class AuthService {
   }
 
   static async loadProfile(userId: string): Promise<ProfileModel | null> {
-    let { data, error } = await supabase
+    let { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
 
-    if (!data && !error) {
-      const user = (await supabase.auth.getUser()).data.user;
-      if (user?.email) {
-        const byEmail = await supabase
-          .from('profiles')
-          .select('*')
-          .ilike('email', user.email.trim())
-          .maybeSingle();
-        data = byEmail.data;
+    if (!data) {
+      try {
+        const user = (await supabase.auth.getUser()).data.user;
+        if (user?.email) {
+          const byEmail = await supabase
+            .from('profiles')
+            .select('*')
+            .ilike('email', user.email.trim())
+            .maybeSingle();
+          data = byEmail.data;
+        }
+      } catch (err) {
+        console.warn('Fallback profile lookup by email failed:', err);
       }
     }
 

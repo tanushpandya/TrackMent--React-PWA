@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, LogIn } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, AlertCircle, LogIn, Sparkles } from 'lucide-react';
 import { FluidMascot } from '../../components/mascot/FluidMascot';
 import { AuthService } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
@@ -14,9 +14,25 @@ export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { refreshProfile } = useAuth();
+  const { status, profile, user, refreshProfile } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+
+  // Reactive redirect: automatically navigate as soon as session/profile is resolved
+  useEffect(() => {
+    if (status === 'ready' && profile) {
+      if (profile.role === 'MENTOR') {
+        navigate('/mentor/dashboard', { replace: true });
+      } else if (profile.role === 'TEAM_LEAD') {
+        navigate('/lead/dashboard', { replace: true });
+      } else {
+        navigate('/student/dashboard', { replace: true });
+      }
+    } else if (status === 'newUser') {
+      const detected = AuthService.detectEmailRole(user?.email);
+      navigate(detected === 'MENTOR' ? '/profile/faculty' : '/profile/student', { replace: true });
+    }
+  }, [status, profile, user, navigate]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -31,27 +47,29 @@ export const LoginScreen: React.FC = () => {
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
       setErrorMsg('Please enter both your RVCE email and password.');
       return;
     }
 
-    if (!AuthService.isAllowedEmail(email)) {
-      setErrorMsg('Please use your official @rvce.edu.in institutional email.');
+    if (!AuthService.isAllowedEmail(cleanEmail)) {
+      setErrorMsg('Please use your official @rvce.edu.in institutional email or choose a demo account below.');
       return;
     }
 
     setLoading(true);
     setErrorMsg(null);
     try {
-      await AuthService.signInWithPassword(email, password);
+      await AuthService.signInWithPassword(cleanEmail, password);
       await refreshProfile();
       showToast('Logged in successfully! ✨', 'success');
+      navigate('/', { replace: true });
     } catch (e: any) {
       const msg = e?.message?.toLowerCase() || '';
       if (msg.includes('invalid login credentials')) {
         setErrorMsg(
-          'Wrong email or password. If you haven\'t set a password yet, please sign up/in with Google first, then set a password in Edit Profile.'
+          'Invalid email or password. You can click any of the Demo Accounts below to auto-fill working credentials.'
         );
       } else {
         setErrorMsg(e?.message || 'Login failed. Please check your credentials.');
@@ -334,74 +352,84 @@ export const LoginScreen: React.FC = () => {
               <span style={{ fontSize: 16 }}>🌐</span> Sign in with Google (@rvce.edu.in)
             </button>
 
-            {/* Quick Fill Testing Presets (Isolated strictly to DEV mode) */}
-            {import.meta.env.DEV && (
+            {/* Quick Fill Testing & Evaluation Presets */}
+            <div
+              style={{
+                marginTop: 22,
+                paddingTop: 16,
+                borderTop: '1px dashed #D5E8EF',
+                textAlign: 'left',
+              }}
+            >
               <div
                 style={{
-                  marginTop: 20,
-                  paddingTop: 16,
-                  borderTop: '1px dashed #D5E8EF',
-                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 8,
                 }}
               >
-                <div
+                <span
                   style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: '#0B4D88',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 8,
+                    gap: 4,
                   }}
                 >
-                  <span
+                  <Sparkles size={13} color="#27B5C9" /> Demo Accounts (Tap to fill)
+                </span>
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    color: '#0B4D88',
+                    fontWeight: 700,
+                    background: '#EAF4F7',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  Password: 123456
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[
+                  { label: '👨‍🏫 Prof. Alan Turing (Mentor)', email: 'alan.turing@rvce.edu.in' },
+                  { label: '👨‍🏫 Dr. Albert Einstein (Mentor)', email: 'albert.einstein@rvce.edu.in' },
+                  { label: '🎓 Student 1 (Team Lead)', email: 'student1@rvce.edu.in' },
+                  { label: '🎓 Student 2 (Student Member)', email: 'student2@rvce.edu.in' },
+                  { label: '🎓 Student 11 (AIML Student)', email: 'student11@rvce.edu.in' },
+                  { label: '🎓 Student 21 (ISE Student)', email: 'student21@rvce.edu.in' },
+                ].map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => {
+                      setEmail(acc.email);
+                      setPassword('123456');
+                      setErrorMsg(null);
+                    }}
                     style={{
+                      background: email === acc.email ? '#EAF4F7' : '#F8FAFC',
+                      border: email === acc.email ? '1.5px solid #27B5C9' : '1px solid #D5E8EF',
+                      borderRadius: 6,
+                      padding: '5px 9px',
                       fontSize: 11,
-                      fontWeight: 700,
-                      color: '#0B4D88',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
+                      color: email === acc.email ? '#0B4D88' : '#5E788C',
+                      cursor: 'pointer',
+                      fontWeight: email === acc.email ? 700 : 600,
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    🧪 Demo Accounts Quick-Fill (Dev Only)
-                  </span>
-                  <span style={{ fontSize: 10, color: '#7992A1', fontWeight: 600 }}>
-                    Password: 123456
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {[
-                    { label: '👨‍🏫 Prof. Turing (Mentor)', email: 'alan.turing@rvce.edu.in' },
-                    { label: '👨‍🏫 Dr. Einstein (Mentor)', email: 'albert.einstein@rvce.edu.in' },
-                    { label: '🎓 Student 1 (CSE)', email: 'student1@rvce.edu.in' },
-                    { label: '🎓 Student 2 (CSE)', email: 'student2@rvce.edu.in' },
-                    { label: '🎓 Student 11 (AIML)', email: 'student11@rvce.edu.in' },
-                    { label: '🎓 Student 21 (ISE)', email: 'student21@rvce.edu.in' },
-                  ].map((acc) => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      onClick={() => {
-                        setEmail(acc.email);
-                        setPassword('123456');
-                        setErrorMsg(null);
-                      }}
-                      style={{
-                        background: email === acc.email ? '#EAF4F7' : '#F8FAFC',
-                        border: email === acc.email ? '1px solid #27B5C9' : '1px solid #D5E8EF',
-                        borderRadius: 6,
-                        padding: '4px 8px',
-                        fontSize: 11,
-                        color: email === acc.email ? '#0B4D88' : '#5E788C',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {acc.label}
-                    </button>
-                  ))}
-                </div>
+                    {acc.label}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         ) : (
           <div>

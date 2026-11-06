@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AuthService } from '../services/auth.service';
 import { AppShell } from '../components/layout/AppShell';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
 
@@ -43,9 +44,14 @@ import { TeamInvitationsModal } from '../features/team-formation/TeamInvitations
 
 /** Root redirect helper based on role */
 const RootRedirect: React.FC = () => {
-  const { status, profile, isMentor, isLead } = useAuth();
+  const { status, user, profile, isMentor, isLead } = useAuth();
   if (status === 'loading') return null;
-  if (status === 'guest' || !profile) return <Navigate to="/login" replace />;
+  if (status === 'guest' || !user) return <Navigate to="/login" replace />;
+  if (status === 'newUser') {
+    const detected = AuthService.detectEmailRole(user?.email);
+    return <Navigate to={detected === 'MENTOR' ? '/profile/faculty' : '/profile/student'} replace />;
+  }
+  if (!profile) return <Navigate to="/login" replace />;
   if (isMentor) return <Navigate to="/mentor/dashboard" replace />;
   if (isLead) return <Navigate to="/lead/dashboard" replace />;
   return <Navigate to="/student/dashboard" replace />;

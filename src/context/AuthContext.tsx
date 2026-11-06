@@ -35,7 +35,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUser(currentUser);
 
-    // Enforce RVCE domain if email is present
+    // First, check if user has an existing profile in the database
+    try {
+      const prof = await AuthService.loadProfile(currentUser.id);
+      if (prof) {
+        setProfile(prof);
+        setStatus('ready');
+        return;
+      }
+    } catch (e) {
+      console.error('Error loading profile:', e);
+    }
+
+    // If no existing profile, check domain compliance before onboarding
     if (currentUser.email && !AuthService.isAllowedEmail(currentUser.email)) {
       await supabase.auth.signOut();
       setUser(null);
@@ -44,20 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    try {
-      const prof = await AuthService.loadProfile(currentUser.id);
-      if (prof) {
-        setProfile(prof);
-        setStatus('ready');
-      } else {
-        setProfile(null);
-        setStatus('newUser');
-      }
-    } catch (e) {
-      console.error('Error loading profile:', e);
-      setProfile(null);
-      setStatus('newUser');
-    }
+    setProfile(null);
+    setStatus('newUser');
   }, []);
 
   useEffect(() => {
