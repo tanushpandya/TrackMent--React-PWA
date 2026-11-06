@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Bell } from 'lucide-react';
+import { Menu, Bell, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
@@ -9,7 +9,7 @@ interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
-  const { profile, isMentor, isLead } = useAuth();
+  const { profile, isMentor, isLead, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
@@ -156,7 +156,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         <button
           onClick={() => navigate('/profile/edit')}
           aria-label="User profile"
-          title={profile?.fullName || 'Profile'}
+          title={`Edit Profile (${profile?.fullName || 'User'})`}
           style={{
             width: 38,
             height: 38,
@@ -173,6 +173,35 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
           }}
         >
           {getInitials(profile?.fullName)}
+        </button>
+
+        {/* Global One-Click Sign Out Button */}
+        <button
+          onClick={async () => {
+            await signOut();
+            showToast('Logged out successfully.', 'info');
+            navigate('/login');
+          }}
+          aria-label="Sign Out"
+          title="Sign Out of TrackMent"
+          style={{
+            height: 36,
+            padding: '0 10px',
+            borderRadius: 10,
+            border: '1px solid #D5E8EF',
+            background: 'rgba(255, 255, 255, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            color: '#B34F5C',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <LogOut size={14} />
+          <span>Log Out</span>
         </button>
       </div>
     </header>

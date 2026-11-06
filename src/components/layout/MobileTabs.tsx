@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Sparkles, Calendar, Users, CheckCircle, TrendingUp } from 'lucide-react';
+import { Home, Sparkles, Calendar, Users, CheckCircle, TrendingUp, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const MobileTabs: React.FC = () => {
@@ -13,6 +13,7 @@ export const MobileTabs: React.FC = () => {
         { label: 'Add Team', to: '/mentor/add-team', icon: Users },
         { label: 'Triage', to: '/mentor/triage', icon: CheckCircle },
         { label: 'Queue', to: '/mentor/queue-monitor', icon: Calendar },
+        { label: 'Profile', to: '/profile/edit', icon: User },
       ];
     }
     if (isLead) {
@@ -21,6 +22,7 @@ export const MobileTabs: React.FC = () => {
         { label: 'Review', to: '/lead/review', icon: CheckCircle },
         { label: 'Progress', to: '/lead/progress', icon: TrendingUp },
         { label: 'Meetings', to: '/lead/meeting', icon: Calendar },
+        { label: 'Profile', to: '/profile/edit', icon: User },
       ];
     }
     // Student
@@ -29,6 +31,7 @@ export const MobileTabs: React.FC = () => {
       { label: 'Contributions', to: '/student/contributions', icon: Sparkles },
       { label: 'Meetings', to: '/student/meeting', icon: Calendar },
       { label: 'My Team', to: '/student/team-info', icon: Users },
+      { label: 'Profile', to: '/profile/edit', icon: User },
     ];
   };
 

@@ -5,11 +5,11 @@ import { App } from './app/App';
 import './styles/tokens.css';
 import './styles/global.css';
 
-// Register PWA service worker with auto-update
-const updateSW = registerSW({
+// Register PWA service worker smoothly without jarring page reloads
+registerSW({
+  immediate: true,
   onNeedRefresh() {
-    console.log('[TrackMent PWA] New content available, reloading...');
-    updateSW(true);
+    console.log('[TrackMent PWA] Service worker update available.');
   },
   onOfflineReady() {
     console.log('[TrackMent PWA] App ready to work offline.');

@@ -19,8 +19,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { team, loading: teamLoading } = useTeam();
   const location = useLocation();
 
-  // 1. Still resolving session
-  if (status === 'loading' || (status === 'ready' && !isMentor && teamLoading)) {
+  // 1. Still resolving session on initial cold load
+  if (status === 'loading' || (status === 'ready' && !isMentor && teamLoading && team === null)) {
     return (
       <div
         style={{

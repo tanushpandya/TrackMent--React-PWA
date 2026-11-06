@@ -280,23 +280,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               await signOut();
               navigate('/login');
             }}
-            title="Sign Out"
+            title="Sign Out of TrackMent"
             style={{
-              background: 'none',
-              border: 'none',
-              color: '#8AA0AB',
+              background: '#FFF1F2',
+              border: '1px solid #FECDD3',
+              color: '#B34F5C',
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
-              fontSize: 11,
-              fontWeight: 750,
+              gap: 6,
+              fontSize: 11.5,
+              fontWeight: 800,
               cursor: 'pointer',
-              padding: '4px 6px',
-              borderRadius: 6,
+              padding: '5px 10px',
+              borderRadius: 8,
+              transition: 'all 0.15s ease',
             }}
           >
             <LogOut size={13} />
-            <span>Exit</span>
+            <span>Log Out</span>
           </button>
         </div>
       </aside>

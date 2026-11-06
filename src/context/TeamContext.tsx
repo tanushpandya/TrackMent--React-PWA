@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { TeamService } from '../services/team.service';
 import { AuthService } from '../services/auth.service';
@@ -21,8 +21,9 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [members, setMembers] = useState<ProfileModel[]>([]);
   const [mentor, setMentor] = useState<ProfileModel | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const isFirstFetch = useRef(true);
 
-  const loadTeamData = useCallback(async () => {
+  const loadTeamData = useCallback(async (isSilent = false) => {
     if (!user || isMentor) {
       setTeam(null);
       setMembers([]);
@@ -32,7 +33,9 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      setLoading(true);
+      if (!isSilent && isFirstFetch.current) {
+        setLoading(true);
+      }
       const myTeam = await TeamService.fetchMyTeam(user.id);
       setTeam(myTeam);
 
@@ -50,36 +53,38 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.error('Error loading team data:', e);
     } finally {
+      isFirstFetch.current = false;
       setLoading(false);
     }
-  }, [user, isMentor]);
+  }, [user?.id, isMentor]);
 
   useEffect(() => {
-    loadTeamData();
+    loadTeamData(false);
   }, [loadTeamData]);
 
-  // Realtime updates subscription
+  // Realtime updates subscription (runs silently without UI unmount)
+  const currentUserId = user?.id;
   useEffect(() => {
-    if (!user || isMentor) return;
+    if (!currentUserId || isMentor) return;
 
-    const channelName = `realtime:team_context_${user.id}`;
+    const channelName = `realtime:team_context_${currentUserId}`;
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, () => {
-        loadTeamData();
+        loadTeamData(true);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
-        loadTeamData();
+        loadTeamData(true);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_transfer_requests' }, () => {
-        loadTeamData();
+        loadTeamData(true);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, isMentor, loadTeamData]);
+  }, [currentUserId, isMentor, loadTeamData]);
 
   return (
     <TeamContext.Provider
@@ -88,7 +93,7 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
         members,
         mentor,
         loading,
-        refreshTeam: loadTeamData,
+        refreshTeam: () => loadTeamData(false),
       }}
     >
       {children}

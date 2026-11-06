@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, KeyRound, ShieldAlert, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Trash2, KeyRound, ShieldAlert, CheckCircle, ArrowLeft, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { AuthService } from '../../services/auth.service';
@@ -443,6 +443,45 @@ export const EditProfileScreen: React.FC = () => {
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <KeyRound size={15} /> Set / Change Password
+          </button>
+        </div>
+      </AppCard>
+
+      {/* Account Session / Logout */}
+      <AppCard
+        title="Account Session"
+        subtitle="Manage your current active session on this device."
+        accent={false}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#102F48' }}>Sign Out of TrackMent</div>
+            <div style={{ fontSize: 12, color: '#5E788C', marginTop: 2 }}>
+              Securely end your session on this browser. You can log back in at any time.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut();
+              showToast('Logged out successfully.', 'info');
+              navigate('/login');
+            }}
+            className="btn"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#F1F5F9',
+              color: '#334155',
+              fontWeight: 700,
+              padding: '10px 18px',
+              border: '1px solid #CBD5E1',
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+          >
+            <LogOut size={16} /> Log Out
           </button>
         </div>
       </AppCard>

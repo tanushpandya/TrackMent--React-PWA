@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import { AuthService } from '../services/auth.service';
@@ -24,6 +24,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileModel | null>(null);
+
+  // References to prevent unnecessary re-renders on tab switch / visibility changes
+  const activeUserRef = useRef<User | null>(null);
+  const activeProfileRef = useRef<ProfileModel | null>(null);
+  activeUserRef.current = user;
+  activeProfileRef.current = profile;
 
   const resolveSession = useCallback(async (currentUser: User | null) => {
     if (!currentUser) {
@@ -61,16 +67,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Initial check
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       resolveSession(session?.user || null);
     });
 
-    // Listen for auth state changes
+    // Listen for auth state changes without triggering full unmounts on tab switch
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      resolveSession(session?.user || null);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null);
+        setProfile(null);
+        setStatus('guest');
+        return;
+      }
+
+      // If token refreshed or background ping for already active user:
+      // Don't trigger full reload or unmount the current page
+      if (
+        (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') &&
+        activeUserRef.current?.id === session.user.id &&
+        activeProfileRef.current !== null
+      ) {
+        return;
+      }
+
+      await resolveSession(session.user);
     });
 
     return () => {
