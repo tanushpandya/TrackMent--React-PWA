@@ -1,0 +1,50 @@
+:root {
+  /* Canvas & Backgrounds */
+  --canvas-bg: #EAF4F7;
+  --surface: #FFFFFF;
+  --border-light: #D5E8EF;
+  --secondary-fill: #DCECEF;
+
+  /* Typography & Hierarchy */
+  --text-primary: #102F48;
+  --text-secondary: #5E788C;
+  --text-placeholder: #7992A1;
+
+  /* Brand & Semantic System */
+  --primary: #0B4D88;
+  --primary-hover: #087AA9;
+  --cyan: #27B5C9;
+  --nav-shell: #102F48;
+  --focus-ring: #1598BA;
+  --button-bevel: #B3D0DD;
+  --button-primary-bevel: #0B4C78;
+
+  /* Badges & Role Chips */
+  --lead-bg: #FFF3D7;
+  --lead-text: #997027;
+
+  --mentor-bg: #EDEBFA;
+  --mentor-text: #6D65A5;
+
+  --confirmed-bg: #E4F6F0;
+  --confirmed-text: #328F81;
+  --confirmed: #328F81;
+
+  --danger-bg: #FBECEB;
+  --danger-text: #B34F5C;
+  --danger: #B34F5C;
+
+  --pending-bg: #FFF4D8;
+  --pending-text: #A67827;
+  --pending: #A67827;
+
+  --info-bg: #E5F3FA;
+  --info-border: #176AA7;
+  --info-text: #102F48;
+
+  /* Shadows */
+  --shadow-card: 0 18px 42px rgba(12, 64, 101, 0.17);
+  --shadow-tactile: 0 4px 0 #b3d0dd, 0 8px 16px rgba(14, 74, 111, 0.13);
+  --shadow-tactile-primary: 0 4px 0 #0b4c78, 0 9px 18px rgba(9, 77, 126, 0.27);
+  --shadow-modal: 0 24px 60px rgba(10, 48, 77, 0.28);
+}
