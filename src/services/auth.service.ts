@@ -28,13 +28,13 @@ export class AuthService {
   }
 
   static async signInWithGoogle(): Promise<void> {
-    const origin = window.location.origin;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const redirectUrl = import.meta.env.VITE_APP_URL || origin;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: origin,
+        redirectTo: redirectUrl,
         queryParams: {
-          hd: STUDENT_DOMAIN,
           prompt: 'select_account',
         },
       },
