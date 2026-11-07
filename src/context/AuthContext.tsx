@@ -39,9 +39,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Strict institutional domain enforcement: Only @rvce.edu.in accounts permitted
+    if (currentUser.email && !AuthService.isAllowedEmail(currentUser.email)) {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setStatus('guest');
+      return;
+    }
+
     setUser(currentUser);
 
-    // First, check if user has an existing profile in the database
+    // Check if user has an existing profile in the database
     try {
       const prof = await AuthService.loadProfile(currentUser.id);
       if (prof) {
@@ -51,15 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (e) {
       console.error('Error loading profile:', e);
-    }
-
-    // If no existing profile, check domain compliance before onboarding
-    if (currentUser.email && !AuthService.isAllowedEmail(currentUser.email)) {
-      await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
-      setStatus('guest');
-      return;
     }
 
     setProfile(null);

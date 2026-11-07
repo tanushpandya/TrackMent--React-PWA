@@ -5,18 +5,7 @@ export class AuthService {
   static isAllowedEmail(email?: string | null): boolean {
     if (!email) return false;
     const lower = email.toLowerCase().trim();
-    if (lower.endsWith(`@${STUDENT_DOMAIN}`) || lower.endsWith(`@${FACULTY_DOMAIN}`)) {
-      return true;
-    }
-    // Allow preview deployments & localhost for testing
-    if (typeof window !== 'undefined' && (
-      window.location.hostname.includes('vercel.app') ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1'
-    )) {
-      return true;
-    }
-    return false;
+    return lower.endsWith(`@${STUDENT_DOMAIN}`) || lower.endsWith(`@${FACULTY_DOMAIN}`);
   }
 
   static detectEmailRole(email?: string | null): 'STUDENT' | 'MENTOR' {
@@ -35,6 +24,7 @@ export class AuthService {
       options: {
         redirectTo: redirectUrl,
         queryParams: {
+          hd: STUDENT_DOMAIN, // Strictly restricts Google account picker to @rvce.edu.in
           prompt: 'select_account',
         },
       },

@@ -47,14 +47,14 @@ export const LoginScreen: React.FC = () => {
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !password) {
       setErrorMsg('Please enter both your RVCE email and password.');
       return;
     }
 
     if (!AuthService.isAllowedEmail(cleanEmail)) {
-      setErrorMsg('Please use your official @rvce.edu.in institutional email.');
+      setErrorMsg('Access Restricted: Only official @rvce.edu.in institutional accounts are permitted.');
       return;
     }
 
