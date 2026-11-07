@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, LogIn, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, AlertCircle, LogIn } from 'lucide-react';
 import { FluidMascot } from '../../components/mascot/FluidMascot';
 import { AuthService } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
@@ -54,7 +54,7 @@ export const LoginScreen: React.FC = () => {
     }
 
     if (!AuthService.isAllowedEmail(cleanEmail)) {
-      setErrorMsg('Please use your official @rvce.edu.in institutional email or choose a demo account below.');
+      setErrorMsg('Please use your official @rvce.edu.in institutional email.');
       return;
     }
 
@@ -69,7 +69,7 @@ export const LoginScreen: React.FC = () => {
       const msg = e?.message?.toLowerCase() || '';
       if (msg.includes('invalid login credentials')) {
         setErrorMsg(
-          'Invalid email or password. You can click any of the Demo Accounts below to auto-fill working credentials.'
+          'Invalid email or password. If you have not set a password yet, please sign in with Google first.'
         );
       } else {
         setErrorMsg(e?.message || 'Login failed. Please check your credentials.');
@@ -351,85 +351,6 @@ export const LoginScreen: React.FC = () => {
             >
               <span style={{ fontSize: 16 }}>🌐</span> Sign in with Google (@rvce.edu.in)
             </button>
-
-            {/* Quick Fill Testing & Evaluation Presets */}
-            <div
-              style={{
-                marginTop: 22,
-                paddingTop: 16,
-                borderTop: '1px dashed #D5E8EF',
-                textAlign: 'left',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 800,
-                    color: '#0B4D88',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <Sparkles size={13} color="#27B5C9" /> Demo Accounts (Tap to fill)
-                </span>
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    color: '#0B4D88',
-                    fontWeight: 700,
-                    background: '#EAF4F7',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                  }}
-                >
-                  Password: 123456
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {[
-                  { label: '👨‍🏫 Prof. Alan Turing (Mentor)', email: 'alan.turing@rvce.edu.in' },
-                  { label: '👨‍🏫 Dr. Albert Einstein (Mentor)', email: 'albert.einstein@rvce.edu.in' },
-                  { label: '🎓 Student 1 (Team Lead)', email: 'student1@rvce.edu.in' },
-                  { label: '🎓 Student 2 (Student Member)', email: 'student2@rvce.edu.in' },
-                  { label: '🎓 Student 11 (AIML Student)', email: 'student11@rvce.edu.in' },
-                  { label: '🎓 Student 21 (ISE Student)', email: 'student21@rvce.edu.in' },
-                ].map((acc) => (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    onClick={() => {
-                      setEmail(acc.email);
-                      setPassword('123456');
-                      setErrorMsg(null);
-                    }}
-                    style={{
-                      background: email === acc.email ? '#EAF4F7' : '#F8FAFC',
-                      border: email === acc.email ? '1.5px solid #27B5C9' : '1px solid #D5E8EF',
-                      borderRadius: 6,
-                      padding: '5px 9px',
-                      fontSize: 11,
-                      color: email === acc.email ? '#0B4D88' : '#5E788C',
-                      cursor: 'pointer',
-                      fontWeight: email === acc.email ? 700 : 600,
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {acc.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         ) : (
           <div>

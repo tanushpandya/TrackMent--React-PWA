@@ -36,7 +36,7 @@ export const FacultyProfileScreen: React.FC = () => {
   const [department, setDepartment] = useState(
     profile?.department || 'Computer Science & Engineering'
   );
-  const [facultyCode, setFacultyCode] = useState(profile?.facultyCode || 'FAC-CS-01');
+  const [facultyCode, setFacultyCode] = useState(profile?.facultyCode || '');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 

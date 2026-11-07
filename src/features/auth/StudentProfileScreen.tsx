@@ -36,17 +36,13 @@ export const StudentProfileScreen: React.FC = () => {
       user?.email?.split('@')[0] ||
       ''
   );
-  const [usn, setUsn] = useState(profile?.usn || '1RV22CS001');
+  const [usn, setUsn] = useState(profile?.usn || '');
   const [branch, setBranch] = useState(profile?.branch || 'CSE');
   const [section, setSection] = useState(profile?.section || 'A');
   const [semester, setSemester] = useState<number>(profile?.semester || 6);
-  const [skills, setSkills] = useState<string[]>(
-    profile?.skills?.length ? profile.skills : ['React', 'TypeScript', 'Node.js']
-  );
+  const [skills, setSkills] = useState<string[]>(profile?.skills || []);
   const [skillInput, setSkillInput] = useState('');
-  const [interests, setInterests] = useState<string[]>(
-    profile?.interests?.length ? profile.interests : ['Web Development', 'AI/ML']
-  );
+  const [interests, setInterests] = useState<string[]>(profile?.interests || []);
   const [interestInput, setInterestInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
