@@ -92,16 +92,32 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 9,
+          gap: 7,
           fontSize: 12,
           color: '#7992A1',
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ fontWeight: 650 }}>TrackMent</span>
-        <b style={{ color: '#ADC2CC' }}>/</b>
-        <span style={{ color: '#5E788C', fontWeight: 650 }}>{roleLabel}</span>
-        <b style={{ color: '#ADC2CC' }}>/</b>
-        <strong style={{ color: '#102F48', fontWeight: 850 }}>{getBreadcrumbTitle()}</strong>
+        <span className="desktop-only" style={{ alignItems: 'center', gap: 7 }}>
+          <span style={{ fontWeight: 650 }}>TrackMent</span>
+          <b style={{ color: '#ADC2CC' }}>/</b>
+          <span style={{ color: '#5E788C', fontWeight: 650 }}>{roleLabel}</span>
+          <b style={{ color: '#ADC2CC' }}>/</b>
+        </span>
+        <strong
+          style={{
+            color: '#102F48',
+            fontWeight: 850,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {getBreadcrumbTitle()}
+        </strong>
       </div>
 
       {/* Top Actions */}
@@ -192,16 +208,18 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
             background: 'rgba(255, 255, 255, 0.9)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 6,
             color: '#B34F5C',
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',
             transition: 'all 0.15s ease',
+            flexShrink: 0,
           }}
         >
-          <LogOut size={14} />
-          <span>Log Out</span>
+          <LogOut size={15} />
+          <span className="desktop-only">Log Out</span>
         </button>
       </div>
     </header>

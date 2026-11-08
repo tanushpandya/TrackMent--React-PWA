@@ -212,7 +212,7 @@ export const MentorDashboard: React.FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
           gap: '16px',
           marginBottom: '24px',
         }}
@@ -382,7 +382,7 @@ export const MentorDashboard: React.FC = () => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))',
             gap: '10px',
             marginBottom: '16px',
           }}
@@ -586,7 +586,7 @@ export const MentorDashboard: React.FC = () => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: viewMode === 'cards' ? 'repeat(auto-fill, minmax(300px, 1fr))' : '1fr',
+            gridTemplateColumns: viewMode === 'cards' ? 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))' : '1fr',
             gap: '16px',
             marginBottom: '40px',
           }}

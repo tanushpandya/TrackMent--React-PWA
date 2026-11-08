@@ -762,20 +762,30 @@ export class TeamService {
       .from('team_evaluations')
       .select('*, evaluator:profiles!evaluator_id(full_name)')
       .eq('team_id', teamId)
+      .not('phase_name', 'like', '__%')
       .order('created_at', { ascending: false });
 
-    return (data || []).map((d: any) => ({
-      id: d.id,
-      teamId: d.team_id,
-      evaluatorId: d.evaluator_id,
-      evaluatorName: d.evaluator?.full_name,
-      phaseName: d.phase_name,
-      totalMarks: Number(d.total_marks || 0),
-      maxMarks: Number(d.max_marks || 50),
-      memberMarks: d.member_marks || {},
-      remarks: d.remarks,
-      createdAt: d.created_at,
-    }));
+    return (data || [])
+      .filter((d: any) => {
+        const name = (d.phase_name || '').toLowerCase().trim();
+        if (!name) return false;
+        if (name.startsWith('__')) return false;
+        if (name.includes('visibility')) return false;
+        if (name.includes('dummy') || name.includes('mock') || name.includes('test') || name.includes('demo')) return false;
+        return true;
+      })
+      .map((d: any) => ({
+        id: d.id,
+        teamId: d.team_id,
+        evaluatorId: d.evaluator_id,
+        evaluatorName: d.evaluator?.full_name,
+        phaseName: d.phase_name,
+        totalMarks: Number(d.total_marks || 0),
+        maxMarks: Number(d.max_marks || 50),
+        memberMarks: d.member_marks || {},
+        remarks: d.remarks,
+        createdAt: d.created_at,
+      }));
   }
 
   static async recordTeamEvaluation(data: {

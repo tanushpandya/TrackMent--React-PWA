@@ -88,6 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       )}
 
       <aside
+        className={`sidebar-aside ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}
         style={{
           position: 'sticky',
           top: 0,
@@ -100,8 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           borderRight: '1px solid rgba(255, 255, 255, 0.85)',
           backdropFilter: 'blur(18px)',
           zIndex: 95,
-          transition: 'transform 0.28s ease',
-          transform: isOpen || window.innerWidth > 800 ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* Brand Header */}
@@ -301,6 +301,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
       </aside>
+
+      <style>{`
+        @media (min-width: 801px) {
+          .sidebar-aside {
+            transform: translateX(0) !important;
+          }
+        }
+        @media (max-width: 800px) {
+          .sidebar-aside.sidebar-closed {
+            transform: translateX(-100%) !important;
+          }
+          .sidebar-aside.sidebar-open {
+            transform: translateX(0) !important;
+          }
+        }
+      `}</style>
     </>
   );
 };

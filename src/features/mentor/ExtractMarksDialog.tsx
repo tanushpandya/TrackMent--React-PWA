@@ -53,13 +53,30 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
               TeamService.fetchTeamEvaluations(team.id),
             ]);
 
-            const realEvals = evals.filter((e) => e.phaseName !== '__MARKS_VISIBILITY__');
+            const realEvals = evals.filter((e) => {
+              const p = (e.phaseName || '').toLowerCase().trim();
+              return (
+                p &&
+                !p.startsWith('__') &&
+                !p.includes('visibility') &&
+                !p.includes('dummy') &&
+                !p.includes('mock') &&
+                !p.includes('test') &&
+                !p.includes('demo')
+              );
+            });
 
             for (const member of roster) {
               const isLead = member.id === team.leaderId;
 
-              // Find phase 1 evaluation
-              const p1 = realEvals.find((e) => e.phaseName.toLowerCase().includes('1'));
+              // Find phase 1 evaluation: prefer individual mark for this member over generic cohort mark
+              const p1 =
+                realEvals.find(
+                  (e) =>
+                    e.phaseName.toLowerCase().includes('1') &&
+                    e.memberMarks &&
+                    e.memberMarks[member.id] !== undefined
+                ) || realEvals.find((e) => e.phaseName.toLowerCase().includes('1'));
               const p1Score = p1
                 ? p1.memberMarks && p1.memberMarks[member.id] !== undefined
                   ? p1.memberMarks[member.id]
@@ -67,7 +84,13 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
                 : null;
 
               // Find phase 2 evaluation
-              const p2 = realEvals.find((e) => e.phaseName.toLowerCase().includes('2'));
+              const p2 =
+                realEvals.find(
+                  (e) =>
+                    e.phaseName.toLowerCase().includes('2') &&
+                    e.memberMarks &&
+                    e.memberMarks[member.id] !== undefined
+                ) || realEvals.find((e) => e.phaseName.toLowerCase().includes('2'));
               const p2Score = p2
                 ? p2.memberMarks && p2.memberMarks[member.id] !== undefined
                   ? p2.memberMarks[member.id]
@@ -75,7 +98,13 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
                 : null;
 
               // Find phase 3 evaluation
-              const p3 = realEvals.find((e) => e.phaseName.toLowerCase().includes('3'));
+              const p3 =
+                realEvals.find(
+                  (e) =>
+                    e.phaseName.toLowerCase().includes('3') &&
+                    e.memberMarks &&
+                    e.memberMarks[member.id] !== undefined
+                ) || realEvals.find((e) => e.phaseName.toLowerCase().includes('3'));
               const p3Score = p3
                 ? p3.memberMarks && p3.memberMarks[member.id] !== undefined
                   ? p3.memberMarks[member.id]

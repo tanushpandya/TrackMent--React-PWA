@@ -13,14 +13,7 @@ export const AppShell: React.FC = () => {
       <div className="ambient ambient-a" />
       <div className="ambient ambient-b" />
 
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'grid',
-          gridTemplateColumns: window.innerWidth > 800 ? '258px minmax(0, 1fr)' : '1fr',
-        }}
-        className="app-shell-container"
-      >
+      <div className="app-shell-grid">
         {/* Desktop Sidebar & Mobile Drawer */}
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -28,15 +21,7 @@ export const AppShell: React.FC = () => {
         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <Topbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
 
-          <main
-            style={{
-              maxWidth: 1190,
-              width: '100%',
-              margin: '0 auto',
-              padding: '30px clamp(16px, 4vw, 56px) 90px',
-              flex: 1,
-            }}
-          >
+          <main className="app-shell-main">
             <Outlet />
           </main>
 
@@ -45,9 +30,24 @@ export const AppShell: React.FC = () => {
       </div>
 
       <style>{`
+        .app-shell-grid {
+          display: grid;
+          grid-template-columns: 258px minmax(0, 1fr);
+          min-height: 100vh;
+        }
+        .app-shell-main {
+          max-width: 1190px;
+          width: 100%;
+          margin: 0 auto;
+          padding: 28px clamp(16px, 4vw, 56px) 90px;
+          flex: 1;
+        }
         @media (max-width: 800px) {
-          .app-shell-container {
+          .app-shell-grid {
             display: block !important;
+          }
+          .app-shell-main {
+            padding: 16px 12px 86px !important;
           }
           aside {
             position: fixed !important;

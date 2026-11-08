@@ -82,7 +82,19 @@ export const TeamInformationView: React.FC = () => {
       setMembers(roster);
       setContributions(contribs);
       setFeedbackList(feed);
-      setEvaluations(evals.filter((e: any) => e.phaseName !== '__MARKS_VISIBILITY__'));
+      const cleanEvals = evals.filter((e: any) => {
+        const p = (e.phaseName || '').toLowerCase().trim();
+        return (
+          p &&
+          !p.startsWith('__') &&
+          !p.includes('visibility') &&
+          !p.includes('dummy') &&
+          !p.includes('mock') &&
+          !p.includes('test') &&
+          !p.includes('demo')
+        );
+      });
+      setEvaluations(cleanEvals);
     } catch (e) {
       console.error('Failed to load team data:', e);
       showToast('Could not load team details', 'error');
@@ -426,45 +438,62 @@ export const TeamInformationView: React.FC = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {evaluations.map((ev) => (
-                  <div
-                    key={ev.id}
-                    style={{
-                      padding: '12px 16px',
-                      background: 'var(--color-canvas)',
-                      borderRadius: '8px',
-                      border: '1px solid var(--color-border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '8px',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        {ev.phaseName}
-                      </div>
-                      {ev.remarks && (
-                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                          "{ev.remarks}"
-                        </div>
-                      )}
-                    </div>
+                {evaluations.map((ev) => {
+                  const memberIds = Object.keys(ev.memberMarks || {});
+                  const isIndividual = memberIds.length === 1;
+                  const targetMember = isIndividual ? members.find((m) => m.id === memberIds[0]) : null;
+
+                  return (
                     <div
+                      key={ev.id}
                       style={{
-                        fontSize: '16px',
-                        fontWeight: 900,
-                        color: 'var(--color-primary)',
-                        background: 'rgba(11, 77, 136, 0.08)',
-                        padding: '4px 12px',
-                        borderRadius: '6px',
+                        padding: '12px 16px',
+                        background: 'var(--color-canvas)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--color-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '8px',
                       }}
                     >
-                      {ev.totalMarks} / {ev.maxMarks}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                            {ev.phaseName}
+                          </span>
+                          {targetMember ? (
+                            <span className="badge badge-blue" style={{ fontSize: 11 }}>
+                              Individual: {targetMember.fullName || targetMember.usn}
+                            </span>
+                          ) : (
+                            <span className="badge badge-confirmed" style={{ fontSize: 11 }}>
+                              Cohort (All Members)
+                            </span>
+                          )}
+                        </div>
+                        {ev.remarks && (
+                          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            "{ev.remarks}"
+                          </div>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '16px',
+                          fontWeight: 900,
+                          color: 'var(--color-primary)',
+                          background: 'rgba(11, 77, 136, 0.08)',
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        {ev.totalMarks} / {ev.maxMarks}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </AppCard>
