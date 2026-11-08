@@ -872,10 +872,14 @@ export class TeamService {
         .eq('phase_name', '__MARKS_VISIBILITY__')
         .maybeSingle();
 
-      if (!data) return false;
-      return (data as any).total_marks === 1.0 || (data as any).remarks === 'VISIBLE';
+      // If mentor explicitly marked evaluations as hidden
+      if (data && ((data as any).total_marks === 0.0 || (data as any).remarks === 'HIDDEN')) {
+        return false;
+      }
+      // If mentor explicitly made visible or default when evaluations exist
+      return true;
     } catch (_) {
-      return false;
+      return true;
     }
   }
 

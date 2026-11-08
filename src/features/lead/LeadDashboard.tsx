@@ -27,7 +27,9 @@ import {
   AppointmentModel,
   FeedbackModel,
   JoinRequestModel,
+  TeamEvaluation,
 } from '../../types';
+import { StudentAcademicMarksCard } from '../../components/common/StudentAcademicMarksCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { MetricCard } from '../../components/common/MetricCard';
 import { AppCard } from '../../components/common/AppCard';
@@ -44,6 +46,8 @@ export const LeadDashboard: React.FC = () => {
   const [upcomingMeeting, setUpcomingMeeting] = useState<AppointmentModel | null>(null);
   const [feedbackList, setFeedbackList] = useState<FeedbackModel[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequestModel[]>([]);
+  const [evaluations, setEvaluations] = useState<TeamEvaluation[]>([]);
+  const [isMarksVisible, setIsMarksVisible] = useState<boolean>(true);
   const [copiedCode, setCopiedCode] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -51,16 +55,20 @@ export const LeadDashboard: React.FC = () => {
     if (!team) return;
     try {
       setLoading(true);
-      const [pending, meeting, feedback, requests] = await Promise.all([
+      const [pending, meeting, feedback, requests, evals, vis] = await Promise.all([
         ContributionService.fetchPendingForTeam(team.id),
         AppointmentService.fetchUpcomingForTeam(team.id),
         FeedbackService.fetchForTeam(team.id),
         TeamService.fetchJoinRequests(team.id),
+        TeamService.fetchTeamEvaluations(team.id),
+        TeamService.fetchMarksVisibility(team.id),
       ]);
       setPendingContributions(pending);
       setUpcomingMeeting(meeting);
       setFeedbackList(feedback);
       setJoinRequests(requests);
+      setEvaluations(evals);
+      setIsMarksVisible(vis);
     } catch (e) {
       console.error('Error loading lead dashboard data:', e);
     } finally {
@@ -264,6 +272,13 @@ export const LeadDashboard: React.FC = () => {
           variant={4}
         />
       </div>
+
+      {/* Official Academic Milestone Marks */}
+      <StudentAcademicMarksCard
+        evaluations={evaluations}
+        isMarksVisible={isMarksVisible}
+        loading={loading}
+      />
 
       {/* 2-Column: Review Queue Shortcut & Project Pulse */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 16 }}>

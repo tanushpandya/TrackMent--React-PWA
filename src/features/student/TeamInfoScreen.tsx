@@ -22,6 +22,7 @@ import { AppCard } from '../../components/common/AppCard';
 import { StatusPill } from '../../components/common/StatusPill';
 import { Modal } from '../../components/common/Modal';
 import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
+import { StudentAcademicMarksCard } from '../../components/common/StudentAcademicMarksCard';
 
 export const TeamInfoScreen: React.FC = () => {
   const { user, profile, isLead, isMentor } = useAuth();
@@ -68,63 +69,6 @@ export const TeamInfoScreen: React.FC = () => {
   useEffect(() => {
     loadExtras();
   }, [loadExtras]);
-
-  // Compute authentic evaluations for the logged-in student:
-  // 1. Exclude system/internal records (__MARKS_VISIBILITY__, dummy, test)
-  // 2. Exclude individual evaluations awarded to OTHER teammates
-  // 3. Deduplicate by phase, preferring individual marks over older cohort marks
-  const studentEvaluations = React.useMemo(() => {
-    if (!isMarksVisible && !isMentor) return [];
-
-    const relevant = evaluations.filter((ev) => {
-      const pName = (ev.phaseName || '').toLowerCase().trim();
-      if (
-        !pName ||
-        pName.startsWith('__') ||
-        pName.includes('visibility') ||
-        pName.includes('dummy') ||
-        pName.includes('mock') ||
-        pName.includes('test') ||
-        pName.includes('demo')
-      ) {
-        return false;
-      }
-
-      // If individual member marks were assigned, ensure THIS student is included
-      const hasMemberMarks = ev.memberMarks && Object.keys(ev.memberMarks).length > 0;
-      if (hasMemberMarks) {
-        if (!user?.id || ev.memberMarks[user.id] === undefined) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    // Deduplicate by normalized phase (e.g. 'Phase 1', 'Phase 2')
-    const phaseMap = new Map<string, { ev: TeamEvaluation; score: number }>();
-
-    for (const ev of relevant) {
-      const normKey = ev.phaseName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const isIndividual = user?.id && ev.memberMarks && ev.memberMarks[user.id] !== undefined;
-      const score = isIndividual ? Number(ev.memberMarks[user.id]) : Number(ev.totalMarks);
-
-      const existing = phaseMap.get(normKey);
-      if (!existing) {
-        phaseMap.set(normKey, { ev, score });
-      } else {
-        const existingIsIndividual =
-          user?.id && existing.ev.memberMarks && existing.ev.memberMarks[user.id] !== undefined;
-        if (isIndividual && !existingIsIndividual) {
-          phaseMap.set(normKey, { ev, score });
-        }
-      }
-    }
-
-    return Array.from(phaseMap.values()).map(({ ev, score }) => ({
-      ...ev,
-      displayScore: score,
-    }));
-  }, [evaluations, user?.id, isMarksVisible, isMentor]);
 
   useEffect(() => {
     if (team) {
@@ -405,49 +349,7 @@ export const TeamInfoScreen: React.FC = () => {
       </AppCard>
 
       {/* 3. Academic Marks & Milestone Evaluations */}
-      {(isMarksVisible || isMentor) && studentEvaluations.length > 0 && (
-        <AppCard title="Academic Evaluations & Milestone Marks">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {studentEvaluations.map((ev) => (
-              <div
-                key={ev.id}
-                style={{
-                  padding: '14px 18px',
-                  borderRadius: 14,
-                  background: '#FFFFFF',
-                  border: '1px solid #D5E8EF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 850, color: '#102F48' }}>{ev.phaseName}</span>
-                    <span className="badge badge-confirmed">
-                      {ev.displayScore} / {ev.maxMarks} Marks
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#7992A1', marginTop: 3 }}>
-                    Evaluated by {ev.evaluatorName || 'Faculty Mentor'} ·{' '}
-                    {new Date(ev.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  </div>
-                  {ev.remarks && (
-                    <div style={{ fontSize: 12.5, color: '#31566E', marginTop: 6 }}>
-                      "{ev.remarks}"
-                    </div>
-                  )}
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: '#0B4D88' }}>
-                  {((ev.displayScore / ev.maxMarks) * 100).toFixed(0)}%
-                </div>
-              </div>
-            ))}
-          </div>
-        </AppCard>
-      )}
+      <StudentAcademicMarksCard evaluations={evaluations} isMarksVisible={isMarksVisible} />
 
       {/* 4. Active Team Members Roster */}
       <AppCard title={`Team Members (${members.length})`}>

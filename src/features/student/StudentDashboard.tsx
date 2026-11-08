@@ -23,7 +23,10 @@ import {
   ContributionModel,
   AppointmentModel,
   FeedbackModel,
+  TeamEvaluation,
 } from '../../types';
+import { TeamService } from '../../services/team.service';
+import { StudentAcademicMarksCard } from '../../components/common/StudentAcademicMarksCard';
 import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
 import { PageHeader } from '../../components/common/PageHeader';
 import { MetricCard } from '../../components/common/MetricCard';
@@ -39,6 +42,8 @@ export const StudentDashboard: React.FC = () => {
   const [contributions, setContributions] = useState<ContributionModel[]>([]);
   const [upcomingMeeting, setUpcomingMeeting] = useState<AppointmentModel | null>(null);
   const [feedbackList, setFeedbackList] = useState<FeedbackModel[]>([]);
+  const [evaluations, setEvaluations] = useState<TeamEvaluation[]>([]);
+  const [isMarksVisible, setIsMarksVisible] = useState<boolean>(true);
   const [copiedCode, setCopiedCode] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -46,14 +51,18 @@ export const StudentDashboard: React.FC = () => {
     if (!team) return;
     try {
       setLoading(true);
-      const [contribs, meeting, feedback] = await Promise.all([
+      const [contribs, meeting, feedback, evals, vis] = await Promise.all([
         ContributionService.fetchForTeam(team.id),
         AppointmentService.fetchUpcomingForTeam(team.id),
         FeedbackService.fetchForTeam(team.id),
+        TeamService.fetchTeamEvaluations(team.id),
+        TeamService.fetchMarksVisibility(team.id),
       ]);
       setContributions(contribs);
       setUpcomingMeeting(meeting);
       setFeedbackList(feedback);
+      setEvaluations(evals);
+      setIsMarksVisible(vis);
     } catch (e) {
       console.error('Error loading dashboard data:', e);
     } finally {
@@ -292,6 +301,13 @@ export const StudentDashboard: React.FC = () => {
           variant={4}
         />
       </div>
+
+      {/* Official Academic Milestone Marks */}
+      <StudentAcademicMarksCard
+        evaluations={evaluations}
+        isMarksVisible={isMarksVisible}
+        loading={loading}
+      />
 
       {/* 2-Column Grid: Recent Work & Mentor Guidance */}
       <div
