@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { MobileTabs } from './MobileTabs';
+import { RouteLoadingSpinner } from '../common/RouteLoadingSpinner';
 
 export const AppShell: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,7 +23,9 @@ export const AppShell: React.FC = () => {
           <Topbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
 
           <main className="app-shell-main">
-            <Outlet />
+            <Suspense fallback={<RouteLoadingSpinner />}>
+              <Outlet />
+            </Suspense>
           </main>
 
           <MobileTabs />

@@ -1,5 +1,6 @@
 import { supabase, STUDENT_DOMAIN, FACULTY_DOMAIN } from './supabase';
 import { ProfileModel, Role } from '../types';
+import { fastCache } from '../utils/cache';
 
 export class AuthService {
   static isAllowedEmail(email?: string | null): boolean {
@@ -32,62 +33,74 @@ export class AuthService {
     if (error) throw error;
   }
 
-  static async signInWithPassword(email: string, password: string):Promise<void> {
+  static async signInWithPassword(
+    email: string,
+    password: string
+  ): Promise<{ user: any; profile: ProfileModel | null }> {
     const cleanEmail = email.trim().toLowerCase();
     if (!this.isAllowedEmail(cleanEmail)) {
       throw new Error('Please use your official @rvce.edu.in institutional email.');
     }
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password,
     });
     if (error) throw error;
+    if (!data.user) throw new Error('Authentication failed.');
+
+    const profile = await this.loadProfile(data.user.id);
+    return { user: data.user, profile };
   }
 
   static async signOut(): Promise<void> {
+    fastCache.invalidate();
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }
 
   static async loadProfile(userId: string): Promise<ProfileModel | null> {
-    let { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    return fastCache.dedupe(`profile_${userId}`, async () => {
+      let { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (!data) {
-      try {
-        const user = (await supabase.auth.getUser()).data.user;
-        if (user?.email) {
-          const byEmail = await supabase
-            .from('profiles')
-            .select('*')
-            .ilike('email', user.email.trim())
-            .maybeSingle();
-          data = byEmail.data;
+      if (!data) {
+        try {
+          const user = (await supabase.auth.getUser()).data.user;
+          if (user?.email) {
+            const byEmail = await supabase
+              .from('profiles')
+              .select('*')
+              .ilike('email', user.email.trim())
+              .maybeSingle();
+            data = byEmail.data;
+          }
+        } catch (err) {
+          console.warn('Fallback profile lookup by email failed:', err);
         }
-      } catch (err) {
-        console.warn('Fallback profile lookup by email failed:', err);
       }
-    }
 
-    if (!data) return null;
+      if (!data) return null;
 
-    return {
-      id: data.id,
-      email: data.email || '',
-      fullName: data.full_name || '',
-      role: data.role as Role,
-      usn: data.usn,
-      branch: data.branch,
-      section: data.section,
-      semester: data.semester,
-      skills: data.skills || [],
-      interests: data.interests || [],
-      department: data.department,
-      facultyCode: data.faculty_code,
-    };
+      return {
+        id: data.id,
+        email: data.email || '',
+        fullName: data.full_name || '',
+        role: data.role as Role,
+        usn: data.usn,
+        branch: data.branch,
+        section: data.section,
+        semester: data.semester,
+        department: data.department,
+        facultyCode: data.faculty_code,
+        skills: data.skills || [],
+        interests: data.interests || [],
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+    });
   }
 
   static async fetchProfile(userId: string): Promise<ProfileModel | null> {

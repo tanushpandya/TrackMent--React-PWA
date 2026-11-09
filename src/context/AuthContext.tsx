@@ -14,6 +14,7 @@ interface AuthContextType {
   isLead: boolean;
   isStudent: boolean;
   role: Role | null;
+  signInWithPassword: (email: string, pass: string) => Promise<ProfileModel | null>;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -106,6 +107,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [resolveSession]);
 
+  const signInWithPassword = useCallback(async (email: string, pass: string) => {
+    const res = await AuthService.signInWithPassword(email, pass);
+    setUser(res.user);
+    setProfile(res.profile);
+    setStatus(res.profile ? 'ready' : 'newUser');
+    return res.profile;
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     try {
@@ -139,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLead,
         isStudent,
         role,
+        signInWithPassword,
         refreshProfile,
         signOut,
       }}

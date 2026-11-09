@@ -39,8 +39,17 @@ export const BrowseStudentsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('All Branches');
   const [selectedSemester, setSelectedSemester] = useState('All');
+
+  // Debounce search query to eliminate excessive network RPC queries while typing
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [query]);
 
   // Selected students in creation mode
   const [selectedInCreation, setSelectedInCreation] = useState<ProfileModel[]>([]);
@@ -68,7 +77,7 @@ export const BrowseStudentsScreen: React.FC = () => {
       setLoading(true);
       const branchParam = selectedBranch === 'All Branches' ? '' : selectedBranch;
       const [list, invites] = await Promise.all([
-        TeamService.searchAvailableStudents(query, branchParam),
+        TeamService.searchAvailableStudents(debouncedQuery, branchParam),
         isRecruitingMode && team
           ? TeamService.fetchTeamSentInvitations(team.id)
           : Promise.resolve([]),
@@ -81,7 +90,7 @@ export const BrowseStudentsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [query, selectedBranch, isRecruitingMode, team, showToast]);
+  }, [debouncedQuery, selectedBranch, isRecruitingMode, team, showToast]);
 
   useEffect(() => {
     loadStudents();

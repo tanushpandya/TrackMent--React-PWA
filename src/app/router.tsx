@@ -1,46 +1,49 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../services/auth.service';
 import { AppShell } from '../components/layout/AppShell';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
+import { RouteLoadingSpinner } from '../components/common/RouteLoadingSpinner';
 
-// Auth screens
+// Fast critical path - loaded directly
 import { LoginScreen } from '../features/auth/LoginScreen';
-import { StudentProfileScreen } from '../features/auth/StudentProfileScreen';
-import { FacultyProfileScreen } from '../features/auth/FacultyProfileScreen';
-import { SetPasswordScreen } from '../features/auth/SetPasswordScreen';
-import { EditProfileScreen } from '../features/auth/EditProfileScreen';
+
+// Code-split dynamic routes - loaded on-demand
+const StudentProfileScreen = lazy(() => import('../features/auth/StudentProfileScreen').then(m => ({ default: m.StudentProfileScreen })));
+const FacultyProfileScreen = lazy(() => import('../features/auth/FacultyProfileScreen').then(m => ({ default: m.FacultyProfileScreen })));
+const SetPasswordScreen = lazy(() => import('../features/auth/SetPasswordScreen').then(m => ({ default: m.SetPasswordScreen })));
+const EditProfileScreen = lazy(() => import('../features/auth/EditProfileScreen').then(m => ({ default: m.EditProfileScreen })));
 
 // Student screens
-import { StudentDashboard } from '../features/student/StudentDashboard';
-import { MyContributionsScreen } from '../features/student/MyContributionsScreen';
-import { TeamInfoScreen } from '../features/student/TeamInfoScreen';
-import { LeaderVotesScreen } from '../features/student/LeaderVotesScreen';
-import { StudentMeetingScreen } from '../features/student/StudentMeetingScreen';
-import { StudentLedgerScreen } from '../features/student/StudentLedgerScreen';
+const StudentDashboard = lazy(() => import('../features/student/StudentDashboard').then(m => ({ default: m.StudentDashboard })));
+const MyContributionsScreen = lazy(() => import('../features/student/MyContributionsScreen').then(m => ({ default: m.MyContributionsScreen })));
+const TeamInfoScreen = lazy(() => import('../features/student/TeamInfoScreen').then(m => ({ default: m.TeamInfoScreen })));
+const LeaderVotesScreen = lazy(() => import('../features/student/LeaderVotesScreen').then(m => ({ default: m.LeaderVotesScreen })));
+const StudentMeetingScreen = lazy(() => import('../features/student/StudentMeetingScreen').then(m => ({ default: m.StudentMeetingScreen })));
+const StudentLedgerScreen = lazy(() => import('../features/student/StudentLedgerScreen').then(m => ({ default: m.StudentLedgerScreen })));
 
 // Team Lead screens
-import { LeadDashboard } from '../features/lead/LeadDashboard';
-import { ReviewContributionsScreen } from '../features/lead/ReviewContributionsScreen';
-import { UpdateProgressModal } from '../features/lead/UpdateProgressModal';
-import { JoinRequestsScreen } from '../features/lead/JoinRequestsScreen';
-import { BrowseMentorsScreen } from '../features/lead/BrowseMentorsScreen';
+const LeadDashboard = lazy(() => import('../features/lead/LeadDashboard').then(m => ({ default: m.LeadDashboard })));
+const ReviewContributionsScreen = lazy(() => import('../features/lead/ReviewContributionsScreen').then(m => ({ default: m.ReviewContributionsScreen })));
+const UpdateProgressModal = lazy(() => import('../features/lead/UpdateProgressModal').then(m => ({ default: m.UpdateProgressModal })));
+const JoinRequestsScreen = lazy(() => import('../features/lead/JoinRequestsScreen').then(m => ({ default: m.JoinRequestsScreen })));
+const BrowseMentorsScreen = lazy(() => import('../features/lead/BrowseMentorsScreen').then(m => ({ default: m.BrowseMentorsScreen })));
 
 // Mentor screens
-import { MentorDashboard } from '../features/mentor/MentorDashboard';
-import { TeamAdditionMenu } from '../features/mentor/TeamAdditionMenu';
-import { TeamInformationView } from '../features/mentor/TeamInformationView';
-import { SplitTriageScreen } from '../features/mentor/SplitTriageScreen';
-import { QueueMonitorScreen } from '../features/mentor/QueueMonitorScreen';
-import { EntryLedgerScreen } from '../features/mentor/EntryLedgerScreen';
+const MentorDashboard = lazy(() => import('../features/mentor/MentorDashboard').then(m => ({ default: m.MentorDashboard })));
+const TeamAdditionMenu = lazy(() => import('../features/mentor/TeamAdditionMenu').then(m => ({ default: m.TeamAdditionMenu })));
+const TeamInformationView = lazy(() => import('../features/mentor/TeamInformationView').then(m => ({ default: m.TeamInformationView })));
+const SplitTriageScreen = lazy(() => import('../features/mentor/SplitTriageScreen').then(m => ({ default: m.SplitTriageScreen })));
+const QueueMonitorScreen = lazy(() => import('../features/mentor/QueueMonitorScreen').then(m => ({ default: m.QueueMonitorScreen })));
+const EntryLedgerScreen = lazy(() => import('../features/mentor/EntryLedgerScreen').then(m => ({ default: m.EntryLedgerScreen })));
 
 // Team Formation screens
-import { BeforeTeamScreen } from '../features/team-formation/BeforeTeamScreen';
-import { CreateTeamScreen } from '../features/team-formation/CreateTeamScreen';
-import { BrowseTeamsScreen } from '../features/team-formation/BrowseTeamsScreen';
-import { BrowseStudentsScreen } from '../features/team-formation/BrowseStudentsScreen';
-import { TeamInvitationsModal } from '../features/team-formation/TeamInvitationsModal';
+const BeforeTeamScreen = lazy(() => import('../features/team-formation/BeforeTeamScreen').then(m => ({ default: m.BeforeTeamScreen })));
+const CreateTeamScreen = lazy(() => import('../features/team-formation/CreateTeamScreen').then(m => ({ default: m.CreateTeamScreen })));
+const BrowseTeamsScreen = lazy(() => import('../features/team-formation/BrowseTeamsScreen').then(m => ({ default: m.BrowseTeamsScreen })));
+const BrowseStudentsScreen = lazy(() => import('../features/team-formation/BrowseStudentsScreen').then(m => ({ default: m.BrowseStudentsScreen })));
+const TeamInvitationsModal = lazy(() => import('../features/team-formation/TeamInvitationsModal').then(m => ({ default: m.TeamInvitationsModal })));
 
 /** Root redirect helper based on role */
 const RootRedirect: React.FC = () => {
@@ -157,21 +160,35 @@ export const router = createBrowserRouter([
   },
   {
     path: '/profile/student',
-    element: <StudentProfileScreen />,
+    element: (
+      <Suspense fallback={<RouteLoadingSpinner />}>
+        <StudentProfileScreen />
+      </Suspense>
+    ),
   },
   {
     path: '/profile/faculty',
-    element: <FacultyProfileScreen />,
+    element: (
+      <Suspense fallback={<RouteLoadingSpinner />}>
+        <FacultyProfileScreen />
+      </Suspense>
+    ),
   },
   {
     path: '/profile/password',
-    element: <SetPasswordScreen />,
+    element: (
+      <Suspense fallback={<RouteLoadingSpinner />}>
+        <SetPasswordScreen />
+      </Suspense>
+    ),
   },
   {
     path: '/profile/edit',
     element: (
       <ProtectedRoute>
-        <EditProfileScreen />
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <EditProfileScreen />
+        </Suspense>
       </ProtectedRoute>
     ),
   },
@@ -181,7 +198,9 @@ export const router = createBrowserRouter([
     path: '/team-formation/before-team',
     element: (
       <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
-        <BeforeTeamScreen />
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <BeforeTeamScreen />
+        </Suspense>
       </ProtectedRoute>
     ),
   },
@@ -189,7 +208,9 @@ export const router = createBrowserRouter([
     path: '/team-formation/create-team',
     element: (
       <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
-        <CreateTeamScreen />
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <CreateTeamScreen />
+        </Suspense>
       </ProtectedRoute>
     ),
   },
@@ -197,7 +218,9 @@ export const router = createBrowserRouter([
     path: '/team-formation/browse-teams',
     element: (
       <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
-        <BrowseTeamsScreen />
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <BrowseTeamsScreen />
+        </Suspense>
       </ProtectedRoute>
     ),
   },
@@ -205,7 +228,9 @@ export const router = createBrowserRouter([
     path: '/team-formation/browse-students',
     element: (
       <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
-        <BrowseStudentsScreen />
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <BrowseStudentsScreen />
+        </Suspense>
       </ProtectedRoute>
     ),
   },
@@ -213,7 +238,9 @@ export const router = createBrowserRouter([
     path: '/team-formation/invitations',
     element: (
       <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
-        <TeamInvitationsModal />
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <TeamInvitationsModal />
+        </Suspense>
       </ProtectedRoute>
     ),
   },

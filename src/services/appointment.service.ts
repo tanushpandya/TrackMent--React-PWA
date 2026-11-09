@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fastCache } from '../utils/cache';
 import { AppointmentModel, AppointmentStatus } from '../types';
 
 export class AppointmentService {
@@ -9,6 +10,7 @@ export class AppointmentService {
     requestedSlot: string;
     agenda: string;
   }): Promise<AppointmentModel> {
+    fastCache.invalidate('apt_');
     const { data, error } = await supabase
       .from('appointments')
       .insert({
@@ -27,20 +29,22 @@ export class AppointmentService {
   }
 
   static async fetchUpcomingForTeam(teamId: number): Promise<AppointmentModel | null> {
-    const { data } = await supabase
-      .from('appointments')
-      .select('*, teams(team_name)')
-      .eq('team_id', teamId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    return fastCache.dedupe(`apt_upcoming_${teamId}`, async () => {
+      const { data } = await supabase
+        .from('appointments')
+        .select('*, teams(team_name)')
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (!data) return null;
-    const apt = this.mapAppointment(data);
-    if (apt.status === 'COMPLETED' || apt.status === 'CANCELLED') {
-      return null;
-    }
-    return apt;
+      if (!data) return null;
+      const apt = this.mapAppointment(data);
+      if (apt.status === 'COMPLETED' || apt.status === 'CANCELLED') {
+        return null;
+      }
+      return apt;
+    }, 15000);
   }
 
   static async fetchLatestForTeam(teamId: number): Promise<AppointmentModel | null> {

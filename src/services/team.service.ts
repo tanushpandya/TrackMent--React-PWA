@@ -1,4 +1,5 @@
 import { supabase, PROOFS_BUCKET } from './supabase';
+import { fastCache } from '../utils/cache';
 import {
   TeamModel,
   ProfileModel,
@@ -14,103 +15,113 @@ import {
 
 export class TeamService {
   static async fetchMyTeam(userId: string): Promise<TeamModel | null> {
-    const { data: memberData } = await supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', userId)
-      .maybeSingle();
+    return fastCache.dedupe(`my_team_${userId}`, async () => {
+      // Parallelize checking team_members and teams.leader_id to cut waterfall latency in half
+      const [memberRes, leadRes] = await Promise.all([
+        supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', userId)
+          .maybeSingle(),
+        supabase
+          .from('teams')
+          .select('*')
+          .eq('leader_id', userId)
+          .maybeSingle(),
+      ]);
 
-    if (memberData?.team_id) {
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('id', memberData.team_id)
-        .maybeSingle();
-      if (teamData) return this.mapTeam(teamData);
-    }
+      if (leadRes.data) {
+        return this.mapTeam(leadRes.data);
+      }
 
-    // Fallback: check if user is leader of a team
-    const { data: leadData } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('leader_id', userId)
-      .maybeSingle();
+      if (memberRes.data?.team_id) {
+        const { data: teamData } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', memberRes.data.team_id)
+          .maybeSingle();
+        if (teamData) return this.mapTeam(teamData);
+      }
 
-    if (leadData) return this.mapTeam(leadData);
-    return null;
+      return null;
+    }, 25000);
   }
 
   static async fetchTeamById(teamId: number): Promise<TeamModel | null> {
-    const { data } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('id', teamId)
-      .maybeSingle();
+    return fastCache.dedupe(`team_${teamId}`, async () => {
+      const { data } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', teamId)
+        .maybeSingle();
 
-    if (data) return this.mapTeam(data);
+      if (data) return this.mapTeam(data);
 
-    // Fallback to directory RPC
-    try {
-      const dir = await this.fetchTeamDirectory();
-      const match = dir.find((d) => d.team.id === teamId);
-      if (match) return match.team;
-    } catch (_) {}
+      // Fallback to directory RPC
+      try {
+        const dir = await this.fetchTeamDirectory();
+        const match = dir.find((d) => d.team.id === teamId);
+        if (match) return match.team;
+      } catch (_) {}
 
-    return null;
+      return null;
+    }, 30000);
   }
 
   static async fetchRoster(teamId: number): Promise<ProfileModel[]> {
-    try {
-      const { data, error } = await supabase
-        .from('team_members')
-        .select('profiles(*)')
-        .eq('team_id', teamId);
+    return fastCache.dedupe(`roster_${teamId}`, async () => {
+      try {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select('profiles(*)')
+          .eq('team_id', teamId);
 
-      if (!error && data && data.length > 0) {
-        return data
-          .map((d: any) => d.profiles)
-          .filter(Boolean)
-          .map((p: any) => ({
-            id: p.id,
-            email: p.email || '',
-            fullName: p.full_name || '',
-            role: p.role,
-            usn: p.usn,
-            branch: p.branch,
-            section: p.section,
-            semester: p.semester,
-            skills: p.skills || [],
-            interests: p.interests || [],
-            department: p.department,
-            facultyCode: p.faculty_code,
+        if (!error && data && data.length > 0) {
+          return data
+            .map((d: any) => d.profiles)
+            .filter(Boolean)
+            .map((p: any) => ({
+              id: p.id,
+              email: p.email || '',
+              fullName: p.full_name || '',
+              role: p.role,
+              usn: p.usn,
+              branch: p.branch,
+              section: p.section,
+              semester: p.semester,
+              skills: p.skills || [],
+              interests: p.interests || [],
+              department: p.department,
+              facultyCode: p.faculty_code,
+            }));
+        }
+      } catch (_) {}
+
+      // Fallback to RPC inspect_team_roster
+      try {
+        const { data: res } = await supabase.rpc('inspect_team_roster', {
+          p_team_id: teamId,
+        });
+        if (Array.isArray(res)) {
+          return res.map((r: any) => ({
+            id: (r.id || r.user_id || '').toString(),
+            email: r.email || '',
+            fullName: r.full_name || '',
+            role: r.is_lead ? 'TEAM_LEAD' : r.role || 'STUDENT',
+            usn: r.usn,
+            branch: r.branch,
+            section: r.section,
+            semester: r.semester,
+            skills: r.skills || [],
+            interests: r.interests || [],
+            department: r.department,
+            facultyCode: r.faculty_code,
           }));
-      }
-    } catch (_) {}
+        }
+      } catch (_) {}
 
-    // Fallback to RPC inspect_team_roster
-    try {
-      const { data: res } = await supabase.rpc('inspect_team_roster', {
-        p_team_id: teamId,
-      });
-      if (Array.isArray(res)) {
-        return res.map((r: any) => ({
-          id: (r.id || r.user_id || '').toString(),
-          email: r.email || '',
-          fullName: r.full_name || '',
-          role: r.is_lead ? 'TEAM_LEAD' : r.role || 'STUDENT',
-          usn: r.usn,
-          branch: r.branch,
-          section: r.section,
-          semester: r.semester,
-          skills: r.skills || [],
-          interests: r.interests || [],
-          department: r.department,
-          facultyCode: r.faculty_code,
-        }));
-      }
-    } catch (_) {}
-
-    return [];
+      return [];
+    }, 30000);
   }
 
   static async fetchTeamMembers(teamId: number): Promise<ProfileModel[]> {
@@ -127,48 +138,52 @@ export class TeamService {
   }
 
   static async fetchAllTeams(excludeTeamId?: number): Promise<TeamModel[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_recruiting_teams');
-      if (!error && Array.isArray(data)) {
-        const teams = data.map(this.mapTeam);
-        return excludeTeamId ? teams.filter((t) => t.id !== excludeTeamId) : teams;
-      }
-    } catch (_) {}
+    return fastCache.dedupe(`all_teams_${excludeTeamId || 0}`, async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_recruiting_teams');
+        if (!error && Array.isArray(data)) {
+          const teams = data.map(this.mapTeam);
+          return excludeTeamId ? teams.filter((t) => t.id !== excludeTeamId) : teams;
+        }
+      } catch (_) {}
 
-    const { data } = await supabase
-      .from('teams')
-      .select('id, team_name, project_title, project_gist, theme, branch, leader_id, mentor_id, current_progress_pct, created_at, updated_at')
-      .order('id', { ascending: false });
+      const { data } = await supabase
+        .from('teams')
+        .select('id, team_name, project_title, project_gist, theme, branch, leader_id, mentor_id, current_progress_pct, created_at, updated_at')
+        .order('id', { ascending: false });
 
-    const teams = (data || []).map(this.mapTeam);
-    return excludeTeamId ? teams.filter((t) => t.id !== excludeTeamId) : teams;
+      const teams = (data || []).map(this.mapTeam);
+      return excludeTeamId ? teams.filter((t) => t.id !== excludeTeamId) : teams;
+    }, 20000);
   }
 
   static async fetchTeamDirectory(): Promise<TeamDirectoryEntry[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_team_directory');
-      if (!error && Array.isArray(data)) {
-        return data.map((d: any) => ({
-          team: this.mapTeam(d),
-          leaderName: d.leader_name || d.leader?.full_name,
-          leaderUsn: d.leader_usn || d.leader?.usn,
-          leaderEmail: d.leader_email || d.leader?.email,
-        }));
-      }
-    } catch (_) {}
+    return fastCache.dedupe('team_directory', async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_team_directory');
+        if (!error && Array.isArray(data)) {
+          return data.map((d: any) => ({
+            team: this.mapTeam(d),
+            leaderName: d.leader_name || d.leader?.full_name,
+            leaderUsn: d.leader_usn || d.leader?.usn,
+            leaderEmail: d.leader_email || d.leader?.email,
+          }));
+        }
+      } catch (_) {}
 
-    const { data } = await supabase
-      .from('teams')
-      .select('*, leader:profiles!leader_id(full_name, usn, email)')
-      .order('id', { ascending: false })
-      .limit(1000);
+      const { data } = await supabase
+        .from('teams')
+        .select('*, leader:profiles!leader_id(full_name, usn, email)')
+        .order('id', { ascending: false })
+        .limit(1000);
 
-    return (data || []).map((d: any) => ({
-      team: this.mapTeam(d),
-      leaderName: d.leader?.full_name,
-      leaderUsn: d.leader?.usn,
-      leaderEmail: d.leader?.email,
-    }));
+      return (data || []).map((d: any) => ({
+        team: this.mapTeam(d),
+        leaderName: d.leader?.full_name,
+        leaderUsn: d.leader?.usn,
+        leaderEmail: d.leader?.email,
+      }));
+    }, 20000);
   }
 
   static async createTeam(data: {
@@ -203,6 +218,9 @@ export class TeamService {
 
     if (error) throw error;
     const team = this.mapTeam(created);
+    fastCache.invalidate('my_team_');
+    fastCache.invalidate('all_teams_');
+    fastCache.invalidate('team_directory');
 
     if (data.invitees && data.invitees.length > 0) {
       for (const inv of data.invitees) {
@@ -224,6 +242,9 @@ export class TeamService {
     abstractText?: string;
     objectives?: string;
   }): Promise<void> {
+    fastCache.invalidate(`team_${data.teamId}`);
+    fastCache.invalidate('my_team_');
+    fastCache.invalidate('team_directory');
     try {
       await supabase.rpc('update_team_project_info', {
         p_team_id: data.teamId,
@@ -396,44 +417,47 @@ export class TeamService {
   }
 
   static async searchAvailableStudents(query = '', branch = ''): Promise<ProfileModel[]> {
-    try {
-      const { data, error } = await supabase.rpc('search_available_students', {
-        p_query: query,
-        p_branch: branch || null,
-      });
-      if (!error && Array.isArray(data)) {
-        return data.map((p: any) => ({
-          id: p.id,
-          email: p.email || '',
-          fullName: p.full_name || '',
-          role: 'STUDENT',
-          usn: p.usn,
-          branch: p.branch,
-          section: p.section,
-          semester: p.semester,
-          skills: p.skills || [],
-          interests: p.interests || [],
-        }));
-      }
-    } catch (_) {}
+    const cacheKey = `avail_students_${query.trim().toLowerCase()}_${branch.trim().toLowerCase()}`;
+    return fastCache.dedupe(cacheKey, async () => {
+      try {
+        const { data, error } = await supabase.rpc('search_available_students', {
+          p_query: query,
+          p_branch: branch || null,
+        });
+        if (!error && Array.isArray(data)) {
+          return data.map((p: any) => ({
+            id: p.id,
+            email: p.email || '',
+            fullName: p.full_name || '',
+            role: 'STUDENT',
+            usn: p.usn,
+            branch: p.branch,
+            section: p.section,
+            semester: p.semester,
+            skills: p.skills || [],
+            interests: p.interests || [],
+          }));
+        }
+      } catch (_) {}
 
-    let q = supabase.from('profiles').select('*').eq('role', 'STUDENT');
-    if (branch) q = q.eq('branch', branch);
-    if (query) q = q.ilike('full_name', `%${query}%`);
+      let q = supabase.from('profiles').select('*').eq('role', 'STUDENT');
+      if (branch) q = q.eq('branch', branch);
+      if (query) q = q.ilike('full_name', `%${query}%`);
 
-    const { data } = await q.limit(50);
-    return (data || []).map((p: any) => ({
-      id: p.id,
-      email: p.email || '',
-      fullName: p.full_name || '',
-      role: 'STUDENT',
-      usn: p.usn,
-      branch: p.branch,
-      section: p.section,
-      semester: p.semester,
-      skills: p.skills || [],
-      interests: p.interests || [],
-    }));
+      const { data } = await q.limit(50);
+      return (data || []).map((p: any) => ({
+        id: p.id,
+        email: p.email || '',
+        fullName: p.full_name || '',
+        role: 'STUDENT',
+        usn: p.usn,
+        branch: p.branch,
+        section: p.section,
+        semester: p.semester,
+        skills: p.skills || [],
+        interests: p.interests || [],
+      }));
+    }, 15000);
   }
 
   static async fetchSentInvitations(teamId: number): Promise<TeamInvitationModel[]> {
@@ -574,40 +598,43 @@ export class TeamService {
   }
 
   static async listFacultyMentors(query = '', department = ''): Promise<ProfileModel[]> {
-    try {
-      const { data, error } = await supabase.rpc('list_faculty_mentors', {
-        p_query: query || null,
-        p_department: department || null,
-      });
-      if (!error && Array.isArray(data)) {
-        return data.map((p: any) => ({
-          id: p.id,
-          email: p.email || '',
-          fullName: p.full_name || '',
-          role: 'MENTOR',
-          department: p.department,
-          facultyCode: p.faculty_code,
-          skills: [],
-          interests: [],
-        }));
-      }
-    } catch (_) {}
+    const cacheKey = `faculty_mentors_${query.trim().toLowerCase()}_${department.trim().toLowerCase()}`;
+    return fastCache.dedupe(cacheKey, async () => {
+      try {
+        const { data, error } = await supabase.rpc('list_faculty_mentors', {
+          p_query: query || null,
+          p_department: department || null,
+        });
+        if (!error && Array.isArray(data)) {
+          return data.map((p: any) => ({
+            id: p.id,
+            email: p.email || '',
+            fullName: p.full_name || '',
+            role: 'MENTOR',
+            department: p.department,
+            facultyCode: p.faculty_code,
+            skills: [],
+            interests: [],
+          }));
+        }
+      } catch (_) {}
 
-    let q = supabase.from('profiles').select('*').eq('role', 'MENTOR');
-    if (department) q = q.eq('department', department);
-    if (query) q = q.ilike('full_name', `%${query}%`);
+      let q = supabase.from('profiles').select('*').eq('role', 'MENTOR');
+      if (department) q = q.eq('department', department);
+      if (query) q = q.ilike('full_name', `%${query}%`);
 
-    const { data } = await q.limit(50);
-    return (data || []).map((p: any) => ({
-      id: p.id,
-      email: p.email || '',
-      fullName: p.full_name || '',
-      role: 'MENTOR',
-      department: p.department,
-      facultyCode: p.faculty_code,
-      skills: [],
-      interests: [],
-    }));
+      const { data } = await q.limit(50);
+      return (data || []).map((p: any) => ({
+        id: p.id,
+        email: p.email || '',
+        fullName: p.full_name || '',
+        role: 'MENTOR',
+        department: p.department,
+        facultyCode: p.faculty_code,
+        skills: [],
+        interests: [],
+      }));
+    }, 60000);
   }
 
   static async sendMentorRequest(teamId: number, mentorId: string, message = ''): Promise<void> {
@@ -758,36 +785,47 @@ export class TeamService {
   }
 
   static async fetchTeamEvaluations(teamId: number): Promise<TeamEvaluation[]> {
-    const { data, error } = await supabase
-      .from('team_evaluations')
-      .select('*, evaluator:profiles!evaluator_id(full_name)')
-      .eq('team_id', teamId)
-      .order('created_at', { ascending: false });
+    return fastCache.dedupe(`evaluations_${teamId}`, async () => {
+      const { data, error } = await supabase
+        .from('team_evaluations')
+        .select('*, evaluator:profiles!evaluator_id(full_name)')
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching team evaluations:', error);
-      return [];
-    }
+      if (error) {
+        console.error('Error fetching team evaluations:', error);
+        return [];
+      }
 
-    return (data || [])
-      .filter((d: any) => {
-        const name = (d.phase_name || '').trim();
-        // Exclude internal system flags like __MARKS_VISIBILITY__
-        if (!name || name.startsWith('__')) return false;
-        return true;
-      })
-      .map((d: any) => ({
-        id: d.id,
-        teamId: d.team_id,
-        evaluatorId: d.evaluator_id,
-        evaluatorName: d.evaluator?.full_name,
-        phaseName: d.phase_name,
-        totalMarks: Number(d.total_marks || 0),
-        maxMarks: Number(d.max_marks || 50),
-        memberMarks: d.member_marks || {},
-        remarks: d.remarks,
-        createdAt: d.created_at,
-      }));
+      // Check for visibility flag in the returned rows and prime the cache
+      const visRow = (data || []).find((d: any) => (d.phase_name || '').trim() === '__MARKS_VISIBILITY__');
+      if (visRow) {
+        const isVis = !(visRow.total_marks === 0.0 || visRow.remarks === 'HIDDEN');
+        fastCache.set(`marks_vis_${teamId}`, isVis, 25000);
+      } else {
+        fastCache.set(`marks_vis_${teamId}`, true, 25000);
+      }
+
+      return (data || [])
+        .filter((d: any) => {
+          const name = (d.phase_name || '').trim();
+          // Exclude internal system flags like __MARKS_VISIBILITY__
+          if (!name || name.startsWith('__')) return false;
+          return true;
+        })
+        .map((d: any) => ({
+          id: d.id,
+          teamId: d.team_id,
+          evaluatorId: d.evaluator_id,
+          evaluatorName: d.evaluator?.full_name,
+          phaseName: d.phase_name,
+          totalMarks: Number(d.total_marks || 0),
+          maxMarks: Number(d.max_marks || 50),
+          memberMarks: d.member_marks || {},
+          remarks: d.remarks,
+          createdAt: d.created_at,
+        }));
+    }, 20000);
   }
 
   static async recordTeamEvaluation(data: {
@@ -798,6 +836,7 @@ export class TeamService {
     memberMarks: Record<string, number>;
     remarks?: string;
   }): Promise<void> {
+    fastCache.invalidate(`evaluations_${data.teamId}`);
     try {
       await supabase.rpc('record_team_evaluation', {
         p_team_id: data.teamId,
@@ -826,6 +865,8 @@ export class TeamService {
   }
 
   static async setMarksVisibility(teamId: number, isVisible: boolean): Promise<void> {
+    fastCache.invalidate(`evaluations_${teamId}`);
+    fastCache.set(`marks_vis_${teamId}`, isVisible, 25000);
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error('Not signed in');
 
@@ -866,23 +907,28 @@ export class TeamService {
   }
 
   static async fetchMarksVisibility(teamId: number): Promise<boolean> {
-    try {
-      const { data } = await supabase
-        .from('team_evaluations')
-        .select('total_marks, remarks')
-        .eq('team_id', teamId)
-        .eq('phase_name', '__MARKS_VISIBILITY__')
-        .maybeSingle();
+    const cached = fastCache.get<boolean>(`marks_vis_${teamId}`);
+    if (cached !== null) return cached;
 
-      // If mentor explicitly marked evaluations as hidden
-      if (data && ((data as any).total_marks === 0.0 || (data as any).remarks === 'HIDDEN')) {
-        return false;
+    return fastCache.dedupe(`marks_vis_${teamId}`, async () => {
+      try {
+        const { data } = await supabase
+          .from('team_evaluations')
+          .select('total_marks, remarks')
+          .eq('team_id', teamId)
+          .eq('phase_name', '__MARKS_VISIBILITY__')
+          .maybeSingle();
+
+        // If mentor explicitly marked evaluations as hidden
+        if (data && ((data as any).total_marks === 0.0 || (data as any).remarks === 'HIDDEN')) {
+          return false;
+        }
+        // If mentor explicitly made visible or default when evaluations exist
+        return true;
+      } catch (_) {
+        return true;
       }
-      // If mentor explicitly made visible or default when evaluations exist
-      return true;
-    } catch (_) {
-      return true;
-    }
+    }, 20000);
   }
 
   private static mapTeam(raw: any): TeamModel {

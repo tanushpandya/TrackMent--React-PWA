@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Search, X, FileSpreadsheet, Download, Loader2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { TeamService } from '../../services/team.service';
 import { TeamModel, ProfileModel, TeamEvaluation } from '../../types';
 import { Modal } from '../../components/common/Modal';
@@ -160,9 +159,10 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
     );
   }, [rows, searchQuery]);
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     if (rows.length === 0) return;
 
+    const XLSX = await import('xlsx');
     const data = filteredRows.map((r) => {
       const total =
         r.phase1 !== null || r.phase2 !== null || r.phase3 !== null

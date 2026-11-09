@@ -1,29 +1,32 @@
 import { supabase, PROOFS_BUCKET } from './supabase';
+import { fastCache } from '../utils/cache';
 import { ContributionModel, ContributionVote, ContributionStatus } from '../types';
 
 export class ContributionService {
   static async fetchForTeam(teamId: number): Promise<ContributionModel[]> {
-    try {
-      const { data, error } = await supabase
+    return fastCache.dedupe(`contribs_${teamId}`, async () => {
+      try {
+        const { data, error } = await supabase
+          .from('contributions')
+          .select('*, profiles:author_id(full_name), contribution_files(*)')
+          .eq('team_id', teamId)
+          .neq('status', 'SOFT_DELETED')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          return data.map(this.mapContribution);
+        }
+      } catch (_) {}
+
+      const { data } = await supabase
         .from('contributions')
-        .select('*, profiles:author_id(full_name), contribution_files(*)')
+        .select('*, contribution_files(*)')
         .eq('team_id', teamId)
         .neq('status', 'SOFT_DELETED')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        return data.map(this.mapContribution);
-      }
-    } catch (_) {}
-
-    const { data } = await supabase
-      .from('contributions')
-      .select('*, contribution_files(*)')
-      .eq('team_id', teamId)
-      .neq('status', 'SOFT_DELETED')
-      .order('created_at', { ascending: false });
-
-    return (data || []).map(this.mapContribution);
+      return (data || []).map(this.mapContribution);
+    }, 15000);
   }
 
   static async fetchTeamContributions(teamId: number): Promise<ContributionModel[]> {
@@ -31,27 +34,29 @@ export class ContributionService {
   }
 
   static async fetchPendingForTeam(teamId: number): Promise<ContributionModel[]> {
-    try {
-      const { data, error } = await supabase
+    return fastCache.dedupe(`contribs_pending_${teamId}`, async () => {
+      try {
+        const { data, error } = await supabase
+          .from('contributions')
+          .select('*, profiles:author_id(full_name), contribution_files(*)')
+          .eq('team_id', teamId)
+          .eq('status', 'PENDING')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          return data.map(this.mapContribution);
+        }
+      } catch (_) {}
+
+      const { data } = await supabase
         .from('contributions')
-        .select('*, profiles:author_id(full_name), contribution_files(*)')
+        .select('*, contribution_files(*)')
         .eq('team_id', teamId)
         .eq('status', 'PENDING')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        return data.map(this.mapContribution);
-      }
-    } catch (_) {}
-
-    const { data } = await supabase
-      .from('contributions')
-      .select('*, contribution_files(*)')
-      .eq('team_id', teamId)
-      .eq('status', 'PENDING')
-      .order('created_at', { ascending: false });
-
-    return (data || []).map(this.mapContribution);
+      return (data || []).map(this.mapContribution);
+    }, 15000);
   }
 
   static async submit(params: {
@@ -75,6 +80,7 @@ export class ContributionService {
       .single();
 
     if (error) throw error;
+    fastCache.invalidate('contribs_');
     return this.mapContribution(data);
   }
 
@@ -91,6 +97,7 @@ export class ContributionService {
       rejection_reason: params.rejectionReason?.trim() || null,
     });
     if (error) throw error;
+    fastCache.invalidate('contribs_');
   }
 
   static async fetchVotes(contributionIds: number[]): Promise<ContributionVote[]> {
@@ -120,10 +127,12 @@ export class ContributionService {
       p_reason: params.reason || null,
     });
     if (error) throw error;
+    fastCache.invalidate('contribs_');
     return data?.toString() || 'PENDING';
   }
 
   static async deleteContribution(contributionId: number, authorId: string): Promise<void> {
+    fastCache.invalidate('contribs_');
     // 1. Collect files to delete
     let paths: string[] = [];
     try {

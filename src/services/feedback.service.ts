@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fastCache } from '../utils/cache';
 import { FeedbackModel, FeedbackType } from '../types';
 
 export class FeedbackService {
@@ -9,6 +10,7 @@ export class FeedbackService {
     content?: string | null;
     sendEmailNotification?: boolean;
   }): Promise<FeedbackModel> {
+    fastCache.invalidate('feedback_');
     const trimmed = params.content?.trim();
     const cleanContent = trimmed && trimmed.length > 0 ? trimmed : null;
 
@@ -83,14 +85,16 @@ export class FeedbackService {
   }
 
   static async fetchForTeam(teamId: number): Promise<FeedbackModel[]> {
-    const { data, error } = await supabase
-      .from('feedback')
-      .select('*, profiles:mentor_id(full_name)')
-      .eq('team_id', teamId)
-      .order('created_at', { ascending: false });
+    return fastCache.dedupe(`feedback_${teamId}`, async () => {
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('*, profiles:mentor_id(full_name)')
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return (data || []).map(this.mapFeedback);
+      if (error) throw error;
+      return (data || []).map(this.mapFeedback);
+    }, 15000);
   }
 
   static async fetchTeamFeedback(teamId: number): Promise<FeedbackModel[]> {
@@ -131,6 +135,8 @@ export class FeedbackService {
     const { error } = await supabase.from('feedback').insert(rows);
     if (error) {
       console.warn('Could not insert broadcast feedback rows:', error);
+    } else {
+      fastCache.invalidate('feedback_');
     }
 
     try {

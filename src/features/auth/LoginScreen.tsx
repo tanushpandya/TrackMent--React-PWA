@@ -14,7 +14,7 @@ export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { status, profile, user, refreshProfile } = useAuth();
+  const { status, profile, user, signInWithPassword } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -61,10 +61,18 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      await AuthService.signInWithPassword(cleanEmail, password);
-      await refreshProfile();
+      const prof = await signInWithPassword(cleanEmail, password);
       showToast('Logged in successfully! ✨', 'success');
-      navigate('/', { replace: true });
+      if (prof?.role === 'MENTOR') {
+        navigate('/mentor/dashboard', { replace: true });
+      } else if (prof?.role === 'TEAM_LEAD') {
+        navigate('/lead/dashboard', { replace: true });
+      } else if (prof?.role === 'STUDENT') {
+        navigate('/student/dashboard', { replace: true });
+      } else {
+        const detected = AuthService.detectEmailRole(cleanEmail);
+        navigate(detected === 'MENTOR' ? '/profile/faculty' : '/profile/student', { replace: true });
+      }
     } catch (e: any) {
       const msg = e?.message?.toLowerCase() || '';
       if (msg.includes('invalid login credentials')) {

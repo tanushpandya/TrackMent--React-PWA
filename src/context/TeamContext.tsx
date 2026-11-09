@@ -17,11 +17,51 @@ const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile, isMentor } = useAuth();
-  const [team, setTeam] = useState<TeamModel | null>(null);
-  const [members, setMembers] = useState<ProfileModel[]>([]);
-  const [mentor, setMentor] = useState<ProfileModel | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+
+  // Instant pre-hydration from sessionStorage: eliminates the 500ms initial wait waterfall
+  const [team, setTeam] = useState<TeamModel | null>(() => {
+    try {
+      const stored = sessionStorage.getItem('trackment_cached_team');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [members, setMembers] = useState<ProfileModel[]>(() => {
+    try {
+      const stored = sessionStorage.getItem('trackment_cached_members');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [mentor, setMentor] = useState<ProfileModel | null>(() => {
+    try {
+      const stored = sessionStorage.getItem('trackment_cached_mentor');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => !team);
   const isFirstFetch = useRef(true);
+
+  const saveCache = (t: TeamModel | null, m: ProfileModel[], men: ProfileModel | null) => {
+    try {
+      if (t) {
+        sessionStorage.setItem('trackment_cached_team', JSON.stringify(t));
+        sessionStorage.setItem('trackment_cached_members', JSON.stringify(m));
+        sessionStorage.setItem('trackment_cached_mentor', JSON.stringify(men));
+      } else {
+        sessionStorage.removeItem('trackment_cached_team');
+        sessionStorage.removeItem('trackment_cached_members');
+        sessionStorage.removeItem('trackment_cached_mentor');
+      }
+    } catch (_) {}
+  };
 
   const loadTeamData = useCallback(async (isSilent = false) => {
     if (!user || isMentor) {
@@ -29,11 +69,13 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setMembers([]);
       setMentor(null);
       setLoading(false);
+      saveCache(null, [], null);
       return;
     }
 
     try {
-      if (!isSilent && isFirstFetch.current) {
+      // Only show full-screen skeleton if there is NO cached team available
+      if (!isSilent && isFirstFetch.current && !team) {
         setLoading(true);
       }
       const myTeam = await TeamService.fetchMyTeam(user.id);
@@ -46,9 +88,11 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ]);
         setMembers(roster);
         setMentor(mentorProfile);
+        saveCache(myTeam, roster, mentorProfile);
       } else {
         setMembers([]);
         setMentor(null);
+        saveCache(null, [], null);
       }
     } catch (e) {
       console.error('Error loading team data:', e);
@@ -56,7 +100,7 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isFirstFetch.current = false;
       setLoading(false);
     }
-  }, [user?.id, isMentor]);
+  }, [user?.id, isMentor, team]);
 
   useEffect(() => {
     loadTeamData(false);
