@@ -758,20 +758,22 @@ export class TeamService {
   }
 
   static async fetchTeamEvaluations(teamId: number): Promise<TeamEvaluation[]> {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('team_evaluations')
       .select('*, evaluator:profiles!evaluator_id(full_name)')
       .eq('team_id', teamId)
-      .not('phase_name', 'like', '__%')
       .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching team evaluations:', error);
+      return [];
+    }
 
     return (data || [])
       .filter((d: any) => {
-        const name = (d.phase_name || '').toLowerCase().trim();
-        if (!name) return false;
-        if (name.startsWith('__')) return false;
-        if (name.includes('visibility')) return false;
-        if (name.includes('dummy') || name.includes('mock') || name.includes('test') || name.includes('demo')) return false;
+        const name = (d.phase_name || '').trim();
+        // Exclude internal system flags like __MARKS_VISIBILITY__
+        if (!name || name.startsWith('__')) return false;
         return true;
       })
       .map((d: any) => ({
