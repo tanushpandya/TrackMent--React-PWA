@@ -471,11 +471,11 @@ export const BrowseStudentsScreen: React.FC = () => {
                       onClick={() => handleToggleCreationSelect(student)}
                       style={{
                         width: '100%',
-                        padding: '7px',
-                        borderRadius: '6px',
-                        background: isSelected ? 'var(--color-confirmed)' : 'white',
-                        color: isSelected ? 'white' : 'var(--color-primary)',
-                        border: isSelected ? 'none' : '1.5px solid var(--color-primary)',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        background: isSelected ? '#16A34A' : 'linear-gradient(115deg, #0b4d88 0%, #087da9 100%)',
+                        color: '#ffffff',
+                        border: 'none',
                         fontSize: '12px',
                         fontWeight: 700,
                         cursor: 'pointer',
@@ -483,6 +483,8 @@ export const BrowseStudentsScreen: React.FC = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
+                        boxShadow: isSelected ? '0 2px 0 #15803d' : '0 2px 0 #07335c',
+                        transition: 'all 0.15s ease',
                       }}
                     >
                       {isSelected ? (

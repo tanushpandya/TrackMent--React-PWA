@@ -535,6 +535,20 @@ export class TeamService {
   }
 
   static async fetchJoinRequests(teamId: number, pendingOnly = false): Promise<JoinRequestModel[]> {
+    // 1. Fetch current team member user IDs + team leader ID so we know all current teammates
+    const [membersRes, teamRes] = await Promise.all([
+      supabase.from('team_members').select('user_id').eq('team_id', teamId),
+      supabase.from('teams').select('leader_id').eq('id', teamId).maybeSingle(),
+    ]);
+
+    const activeMemberIds = new Set<string>();
+    if (teamRes.data?.leader_id) {
+      activeMemberIds.add(teamRes.data.leader_id);
+    }
+    (membersRes.data || []).forEach((m: any) => {
+      if (m.user_id) activeMemberIds.add(m.user_id);
+    });
+
     let query = supabase
       .from('join_requests')
       .select('*, profiles:student_id(full_name, usn, branch, skills)')
@@ -546,18 +560,46 @@ export class TeamService {
 
     const { data } = await query.order('created_at', { ascending: false });
 
-    return (data || []).map((d: any) => ({
-      id: d.id,
-      teamId: d.team_id,
-      studentId: d.student_id,
-      studentName: d.profiles?.full_name,
-      studentUsn: d.profiles?.usn,
-      studentBranch: d.profiles?.branch,
-      skills: d.profiles?.skills || [],
-      message: d.message,
-      status: d.status,
-      createdAt: d.created_at,
-    }));
+    const staleRequestIdsToResolve: number[] = [];
+
+    const mapped = (data || [])
+      .map((d: any) => {
+        const isAlreadyTeammate = activeMemberIds.has(d.student_id);
+        if (isAlreadyTeammate && d.status === 'PENDING') {
+          staleRequestIdsToResolve.push(d.id);
+        }
+        return {
+          id: d.id,
+          teamId: d.team_id,
+          studentId: d.student_id,
+          studentName: d.profiles?.full_name,
+          studentUsn: d.profiles?.usn,
+          studentBranch: d.profiles?.branch,
+          skills: d.profiles?.skills || [],
+          message: d.message,
+          status: isAlreadyTeammate ? 'ACCEPTED' : d.status,
+          createdAt: d.created_at,
+          isAlreadyTeammate,
+        };
+      })
+      // If student is already a teammate, they must not show up under pending requests
+      .filter((r: any) => {
+        if (pendingOnly) {
+          return !r.isAlreadyTeammate && r.status === 'PENDING';
+        }
+        return true;
+      });
+
+    // Auto-resolve stale pending requests in database so they don't linger
+    if (staleRequestIdsToResolve.length > 0) {
+      supabase
+        .from('join_requests')
+        .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
+        .in('id', staleRequestIdsToResolve)
+        .then(() => {});
+    }
+
+    return mapped;
   }
 
   static async sendJoinRequest(teamId: number, studentId: string, message = ''): Promise<void> {
@@ -572,6 +614,29 @@ export class TeamService {
 
   static async respondToJoinRequest(requestId: number, accept: boolean): Promise<void> {
     const status = accept ? 'ACCEPTED' : 'REJECTED';
+
+    const { data: req } = await supabase
+      .from('join_requests')
+      .select('student_id, team_id')
+      .eq('id', requestId)
+      .maybeSingle();
+
+    if (accept && req) {
+      try {
+        await supabase.rpc('accept_join_request', { p_request_id: requestId });
+      } catch (_) {}
+
+      try {
+        await supabase.from('team_members').upsert({
+          team_id: req.team_id,
+          user_id: req.student_id,
+        }, { onConflict: 'team_id,user_id' });
+      } catch (_) {}
+
+      fastCache.invalidate(`roster_${req.team_id}`);
+      fastCache.invalidate(`my_team_${req.student_id}`);
+    }
+
     const { error } = await supabase
       .from('join_requests')
       .update({ status, updated_at: new Date().toISOString() })

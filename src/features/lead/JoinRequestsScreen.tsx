@@ -26,7 +26,7 @@ import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBa
 
 export const JoinRequestsScreen: React.FC = () => {
   const { user } = useAuth();
-  const { team, refreshTeam } = useTeam();
+  const { team, members, refreshTeam } = useTeam();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -83,8 +83,17 @@ export const JoinRequestsScreen: React.FC = () => {
     }
   };
 
-  const pending = requests.filter((r) => r.status === 'PENDING');
-  const resolved = requests.filter((r) => r.status !== 'PENDING');
+  const teammateIds = new Set<string>();
+  if (team?.leaderId) teammateIds.add(team.leaderId);
+  (members || []).forEach((m) => teammateIds.add(m.id));
+
+  // Teammates already in the team must never show up as pending join requests
+  const pending = requests.filter(
+    (r) => r.status === 'PENDING' && !teammateIds.has(r.studentId) && !(r as any).isAlreadyTeammate
+  );
+  const resolved = requests.filter(
+    (r) => r.status !== 'PENDING' || teammateIds.has(r.studentId) || (r as any).isAlreadyTeammate
+  );
 
   return (
     <div style={{ minHeight: '100vh', padding: '24px 16px', display: 'flex', justifyContent: 'center' }}>
@@ -151,27 +160,28 @@ export const JoinRequestsScreen: React.FC = () => {
         {/* Prominent ADD MEMBERS Button */}
         <button
           onClick={() => navigate('/team-formation/browse-students?isRecruitingMode=true')}
+          className="btn btn-primary"
           style={{
             width: '100%',
-            height: '50px',
-            background: 'var(--color-primary)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '10px',
+            height: '52px',
+            background: 'linear-gradient(115deg, #0b4d88 0%, #087da9 50%, #22b6c5 100%)',
+            color: '#FFFFFF',
+            border: '1px solid rgba(11, 77, 136, 0.4)',
+            borderRadius: '12px',
             fontSize: '14px',
             fontWeight: 800,
-            letterSpacing: '0.05em',
+            letterSpacing: '0.06em',
             textTransform: 'uppercase',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '10px',
-            boxShadow: '0 4px 0 #07335c',
+            boxShadow: '0 4px 0 #07335c, 0 8px 20px rgba(11, 77, 136, 0.35)',
             marginBottom: '28px',
           }}
         >
-          <UserPlus size={18} />
+          <UserPlus size={19} />
           ADD MEMBERS
         </button>
 

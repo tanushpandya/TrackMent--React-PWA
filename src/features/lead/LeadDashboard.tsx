@@ -59,14 +59,23 @@ export const LeadDashboard: React.FC = () => {
         ContributionService.fetchPendingForTeam(team.id),
         AppointmentService.fetchUpcomingForTeam(team.id),
         FeedbackService.fetchForTeam(team.id),
-        TeamService.fetchJoinRequests(team.id),
+        TeamService.fetchJoinRequests(team.id, true),
         TeamService.fetchTeamEvaluations(team.id),
         TeamService.fetchMarksVisibility(team.id),
       ]);
+
+      const teammateIds = new Set<string>();
+      if (team?.leaderId) teammateIds.add(team.leaderId);
+      (members || []).forEach((m) => teammateIds.add(m.id));
+
+      const actualPendingRequests = requests.filter(
+        (r) => r.status === 'PENDING' && !teammateIds.has(r.studentId)
+      );
+
       setPendingContributions(pending);
       setUpcomingMeeting(meeting);
       setFeedbackList(feedback);
-      setJoinRequests(requests);
+      setJoinRequests(actualPendingRequests);
       setEvaluations(evals);
       setIsMarksVisible(vis);
     } catch (e) {

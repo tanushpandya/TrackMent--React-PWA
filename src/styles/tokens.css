@@ -5,6 +5,18 @@
   --border-light: #D5E8EF;
   --secondary-fill: #DCECEF;
 
+  /* Semantic Theme Aliases */
+  --color-primary: #0B4D88;
+  --color-primary-hover: #087AA9;
+  --color-border: #D5E8EF;
+  --color-canvas: #EAF4F7;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #102F48;
+  --color-text-secondary: #5E788C;
+  --color-confirmed: #16A34A;
+  --color-pending: #A67827;
+  --color-danger: #B34F5C;
+
   /* Typography & Hierarchy */
   --text-primary: #102F48;
   --text-secondary: #5E788C;

@@ -282,17 +282,19 @@ export const CreateTeamScreen: React.FC = () => {
                   type="button"
                   onClick={() => navigate('/team-formation/browse-students?isRecruitingMode=false')}
                   style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: 'white',
-                    border: '1.5px solid var(--color-border)',
-                    color: 'var(--color-primary)',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(115deg, #0b4d88 0%, #087da9 100%)',
+                    border: 'none',
+                    color: '#ffffff',
                     fontSize: '12.5px',
-                    fontWeight: 700,
+                    fontWeight: 800,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '6px',
+                    boxShadow: '0 2px 0 #07335c, 0 4px 10px rgba(11, 77, 136, 0.25)',
+                    transition: 'transform 0.15s ease',
                   }}
                 >
                   <UserPlus size={14} />

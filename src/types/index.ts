@@ -186,6 +186,7 @@ export interface JoinRequestModel {
   skills?: string[];
   message?: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  isAlreadyTeammate?: boolean;
   createdAt: string;
 }
 
