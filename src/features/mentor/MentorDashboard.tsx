@@ -23,6 +23,7 @@ import {
   Loader2,
   RefreshCw,
   Award,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -35,6 +36,7 @@ import { AppCard } from '../../components/common/AppCard';
 import { MetricCard } from '../../components/common/MetricCard';
 import { Modal } from '../../components/common/Modal';
 import { ExtractMarksDialog } from './ExtractMarksDialog';
+import { MentorGanttChart } from './MentorGanttChart';
 
 export const MentorDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -48,7 +50,7 @@ export const MentorDashboard: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'recent'>('name');
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'list' | 'gantt'>('cards');
 
   // Marks visibility
   const [isMarksVisible, setIsMarksVisible] = useState(false);
@@ -531,6 +533,7 @@ export const MentorDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('list')}
+                title="List View"
                 style={{
                   padding: '6px',
                   borderRadius: '6px',
@@ -542,12 +545,32 @@ export const MentorDashboard: React.FC = () => {
               >
                 <List size={16} />
               </button>
+              <button
+                onClick={() => setViewMode('gantt')}
+                title="Gantt Timeline View"
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  background: viewMode === 'gantt' ? 'var(--color-canvas)' : 'transparent',
+                  border: 'none',
+                  color: viewMode === 'gantt' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '12px',
+                  fontWeight: viewMode === 'gantt' ? 700 : 500,
+                }}
+              >
+                <BarChart3 size={15} />
+                <span>Gantt</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Teams Grid / List */}
+      {/* Teams Grid / List / Gantt */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-secondary)' }}>
           <Loader2 size={32} className="spin" style={{ margin: '0 auto 12px' }} />
@@ -582,6 +605,10 @@ export const MentorDashboard: React.FC = () => {
             </button>
           )}
         </AppCard>
+      ) : viewMode === 'gantt' ? (
+        <div style={{ marginBottom: '40px' }}>
+          <MentorGanttChart teams={sortedTeams} />
+        </div>
       ) : (
         <div
           style={{

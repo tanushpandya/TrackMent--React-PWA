@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, LogIn } from 'lucide-react';
 import { FluidMascot } from '../../components/mascot/FluidMascot';
 import { AuthService } from '../../services/auth.service';
@@ -399,6 +399,23 @@ export const LoginScreen: React.FC = () => {
           }}
         >
           Protected by RVCE Single Sign-On and Database Row-Level Security.
+        </div>
+
+        <div style={{ marginTop: 14, textAlign: 'center' }}>
+          <Link
+            to="/manual"
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#0B4D88',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            📖 Read User Manual & Grading Rubrics
+          </Link>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
-import { supabase, PROOFS_BUCKET } from './supabase';
+import { supabase, PROOFS_BUCKET, REPORTS_BUCKET } from './supabase';
 import { fastCache } from '../utils/cache';
+import { StorageService } from './storage.service';
 import {
   TeamModel,
   ProfileModel,
@@ -11,6 +12,7 @@ import {
   MentorRequestModel,
   ProgressHistoryEntry,
   TeamEvaluation,
+  TeamReportModel,
 } from '../types';
 
 export class TeamService {
@@ -887,6 +889,7 @@ export class TeamService {
           totalMarks: Number(d.total_marks || 0),
           maxMarks: Number(d.max_marks || 50),
           memberMarks: d.member_marks || {},
+          rubricScores: d.rubric_scores || null,
           remarks: d.remarks,
           createdAt: d.created_at,
         }));
@@ -900,16 +903,19 @@ export class TeamService {
     maxMarks?: number;
     memberMarks: Record<string, number>;
     remarks?: string;
+    rubricScores?: Record<string, any>;
   }): Promise<void> {
     fastCache.invalidate(`evaluations_${data.teamId}`);
+    const defaultMax = data.phaseName.includes('Phase 1') ? 40 : data.phaseName.includes('Phase 2') ? 60 : data.phaseName.includes('Phase 3') ? 100 : 50;
     try {
       await supabase.rpc('record_team_evaluation', {
         p_team_id: data.teamId,
         p_phase_name: data.phaseName,
         p_total_marks: data.totalMarks,
-        p_max_marks: data.maxMarks || 50,
+        p_max_marks: data.maxMarks || defaultMax,
         p_member_marks: data.memberMarks,
         p_remarks: data.remarks || null,
+        p_rubric_scores: data.rubricScores || {},
       });
       return;
     } catch (_) {}
@@ -922,9 +928,10 @@ export class TeamService {
       evaluator_id: user.id,
       phase_name: data.phaseName,
       total_marks: data.totalMarks,
-      max_marks: data.maxMarks || 50,
+      max_marks: data.maxMarks || defaultMax,
       member_marks: data.memberMarks,
       remarks: data.remarks || null,
+      rubric_scores: data.rubricScores || {},
     });
     if (error) throw error;
   }
@@ -996,7 +1003,163 @@ export class TeamService {
     }, 20000);
   }
 
+  static async uploadTeamReport(params: {
+    teamId: number;
+    slot: 'primary' | 'supplementary';
+    file: File;
+    description: string;
+  }): Promise<TeamReportModel> {
+    const { teamId, slot, file, description } = params;
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) throw new Error('Not authenticated');
+
+    StorageService.validateReportFile(file);
+    if (!description.trim()) {
+      throw new Error('Please enter a descriptive note for the report.');
+    }
+
+    // 1. Fetch current reports to detect replacement
+    const { data: teamRow } = await supabase
+      .from('teams')
+      .select('reports')
+      .eq('id', teamId)
+      .maybeSingle();
+
+    const currentReports: TeamReportModel[] = Array.isArray(teamRow?.reports)
+      ? teamRow.reports.map((r: any) => ({
+          slot: r.slot || 'primary',
+          fileName: r.file_name || r.fileName || 'report.pdf',
+          storagePath: r.storage_path || r.storagePath || '',
+          fileSizeBytes: Number(r.file_size_bytes || r.fileSizeBytes || 0),
+          description: r.description || '',
+          uploadedAt: r.uploaded_at || r.uploadedAt || new Date().toISOString(),
+          uploadedBy: r.uploaded_by || r.uploadedBy || '',
+        }))
+      : [];
+
+    // 2. Remove existing binary if replacing
+    const oldReport = currentReports.find((r) => r.slot === slot);
+    if (oldReport && oldReport.storagePath) {
+      try {
+        await supabase.storage.from(REPORTS_BUCKET).remove([oldReport.storagePath]);
+      } catch (e) {
+        console.warn('[TeamService] Warning: Could not purge replaced report binary:', e);
+      }
+    }
+
+    // 3. Upload new binary
+    const safeFileName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    const storagePath = `reports/team_${teamId}/${slot}_${Date.now()}_${safeFileName}`;
+
+    const { error: uploadErr } = await supabase.storage.from(REPORTS_BUCKET).upload(storagePath, file, {
+      upsert: true,
+      contentType: 'application/pdf',
+    });
+    if (uploadErr) throw uploadErr;
+
+    const newReport: TeamReportModel = {
+      slot,
+      fileName: file.name,
+      storagePath,
+      fileSizeBytes: file.size,
+      description: description.trim(),
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: user.email || user.id,
+    };
+
+    const updatedReports = [
+      ...currentReports.filter((r) => r.slot !== slot),
+      newReport,
+    ];
+
+    try {
+      const { error: rpcErr } = await supabase.rpc('update_team_reports', {
+        p_team_id: teamId,
+        p_reports: updatedReports,
+      });
+      if (rpcErr) throw rpcErr;
+    } catch (_) {
+      const { error: updateErr } = await supabase
+        .from('teams')
+        .update({ reports: updatedReports, updated_at: new Date().toISOString() })
+        .eq('id', teamId);
+      if (updateErr) throw updateErr;
+    }
+
+    fastCache.invalidate(`team_${teamId}`);
+    fastCache.invalidate(`my_team_${user.id}`);
+    return newReport;
+  }
+
+  static async deleteTeamReport(teamId: number, slot: 'primary' | 'supplementary'): Promise<void> {
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) throw new Error('Not authenticated');
+
+    const { data: teamRow } = await supabase
+      .from('teams')
+      .select('reports')
+      .eq('id', teamId)
+      .maybeSingle();
+
+    const currentReports: TeamReportModel[] = Array.isArray(teamRow?.reports)
+      ? teamRow.reports.map((r: any) => ({
+          slot: r.slot || 'primary',
+          fileName: r.file_name || r.fileName || 'report.pdf',
+          storagePath: r.storage_path || r.storagePath || '',
+          fileSizeBytes: Number(r.file_size_bytes || r.fileSizeBytes || 0),
+          description: r.description || '',
+          uploadedAt: r.uploaded_at || r.uploadedAt || new Date().toISOString(),
+          uploadedBy: r.uploaded_by || r.uploadedBy || '',
+        }))
+      : [];
+
+    const target = currentReports.find((r) => r.slot === slot);
+    if (target && target.storagePath) {
+      try {
+        await supabase.storage.from(REPORTS_BUCKET).remove([target.storagePath]);
+      } catch (e) {
+        console.warn('[TeamService] Error deleting storage blob for report:', e);
+      }
+    }
+
+    const updatedReports = currentReports.filter((r) => r.slot !== slot);
+
+    try {
+      const { error: rpcErr } = await supabase.rpc('update_team_reports', {
+        p_team_id: teamId,
+        p_reports: updatedReports,
+      });
+      if (rpcErr) throw rpcErr;
+    } catch (_) {
+      const { error: updateErr } = await supabase
+        .from('teams')
+        .update({ reports: updatedReports, updated_at: new Date().toISOString() })
+        .eq('id', teamId);
+      if (updateErr) throw updateErr;
+    }
+
+    fastCache.invalidate(`team_${teamId}`);
+    fastCache.invalidate(`my_team_${user.id}`);
+  }
+
+  static async getReportSignedUrl(storagePath: string, seconds: number = 3600): Promise<string> {
+    return StorageService.getReportSignedUrl(storagePath, seconds);
+  }
+
   private static mapTeam(raw: any): TeamModel {
+    let reports: TeamReportModel[] = [];
+    if (Array.isArray(raw.reports)) {
+      reports = raw.reports.map((r: any) => ({
+        slot: r.slot || 'primary',
+        fileName: r.file_name || r.fileName || 'report.pdf',
+        storagePath: r.storage_path || r.storagePath || '',
+        fileSizeBytes: Number(r.file_size_bytes || r.fileSizeBytes || 0),
+        description: r.description || '',
+        uploadedAt: r.uploaded_at || r.uploadedAt || new Date().toISOString(),
+        uploadedBy: r.uploaded_by || r.uploadedBy || '',
+      }));
+    }
+
     return {
       id: Number(raw.id),
       teamCode: raw.team_code || '',
@@ -1010,6 +1173,7 @@ export class TeamService {
       leaderId: raw.leader_id || '',
       mentorId: raw.mentor_id,
       currentProgressPct: Number(raw.current_progress_pct || 0),
+      reports,
       createdAt: raw.created_at,
       updatedAt: raw.updated_at,
     };

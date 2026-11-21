@@ -45,6 +45,9 @@ const BrowseTeamsScreen = lazy(() => import('../features/team-formation/BrowseTe
 const BrowseStudentsScreen = lazy(() => import('../features/team-formation/BrowseStudentsScreen').then(m => ({ default: m.BrowseStudentsScreen })));
 const TeamInvitationsModal = lazy(() => import('../features/team-formation/TeamInvitationsModal').then(m => ({ default: m.TeamInvitationsModal })));
 
+// Docs
+const UserManualScreen = lazy(() => import('../features/docs/UserManualScreen').then(m => ({ default: m.UserManualScreen })));
+
 /** Root redirect helper based on role */
 const RootRedirect: React.FC = () => {
   const { status, user, profile, isMentor, isLead } = useAuth();
@@ -179,6 +182,14 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={<RouteLoadingSpinner />}>
         <SetPasswordScreen />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/manual',
+    element: (
+      <Suspense fallback={<RouteLoadingSpinner />}>
+        <UserManualScreen />
       </Suspense>
     ),
   },

@@ -40,6 +40,8 @@ import { Modal } from '../../components/common/Modal';
 import { CohortMarksDialog } from './CohortMarksDialog';
 import { IndividualMemberMarksDialog } from './IndividualMemberMarksDialog';
 import { FeedbackModal } from './FeedbackModal';
+import { TeamReportSubmissionCard } from '../../components/common/TeamReportSubmissionCard';
+import { MentorGanttChart } from './MentorGanttChart';
 
 export const TeamInformationView: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -50,7 +52,7 @@ export const TeamInformationView: React.FC = () => {
 
   const teamId = teamIdParam ? parseInt(teamIdParam, 10) : null;
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'submissions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'submissions' | 'gantt'>('overview');
   const [team, setTeam] = useState<TeamModel | null>(null);
   const [members, setMembers] = useState<ProfileModel[]>([]);
   const [contributions, setContributions] = useState<ContributionModel[]>([]);
@@ -343,11 +345,36 @@ export const TeamInformationView: React.FC = () => {
             {verifiedContributions.length}
           </span>
         </button>
+        <button
+          onClick={() => setActiveTab('gantt')}
+          style={{
+            padding: '10px 18px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeTab === 'gantt' ? '3px solid var(--color-primary)' : '3px solid transparent',
+            color: activeTab === 'gantt' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontSize: '14px',
+            fontWeight: activeTab === 'gantt' ? 800 : 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          Timeline & Gantt
+        </button>
       </div>
 
       {/* Tab 1: Overview */}
       {activeTab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Institutional Project Reports Deliverables */}
+          <TeamReportSubmissionCard
+            team={team}
+            isLeader={false}
+            onUpdated={loadAllData}
+          />
+
           {/* Quick Mentorship Supervision Actions */}
           <AppCard style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
@@ -704,6 +731,17 @@ export const TeamInformationView: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab 3: Timeline & Gantt Chart */}
+      {activeTab === 'gantt' && (
+        <div style={{ marginBottom: '24px' }}>
+          <MentorGanttChart
+            singleTeam={team}
+            singleTeamMembers={members}
+            singleTeamContributions={contributions}
+          />
         </div>
       )}
 

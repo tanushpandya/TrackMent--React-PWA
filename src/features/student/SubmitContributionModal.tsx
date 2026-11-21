@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, Plus, X, Link as LinkIcon, FileText } from 'lucide-react';
+import { Upload, Plus, X, Link as LinkIcon, FileText, CheckCircle2, AlertTriangle, Loader2, FileCheck } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
@@ -28,13 +28,27 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
   const [linkInput, setLinkInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const addLink = () => {
     const clean = linkInput.trim();
-    if (clean) {
+    if (!clean) return;
+    try {
+      const parsed = new URL(clean);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        setErrorMsg('Only valid http:// or https:// links are permitted.');
+        return;
+      }
+      if (links.length >= 10) {
+        setErrorMsg('Maximum 10 external links allowed per deliverable.');
+        return;
+      }
       setLinks([...links, clean]);
       setLinkInput('');
+      setErrorMsg(null);
+    } catch {
+      setErrorMsg('Please enter a valid URL (e.g. https://github.com/...).');
     }
   };
 
@@ -45,15 +59,24 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selected = Array.from(e.target.files);
+      const validFiles: File[] = [];
+
       for (const f of selected) {
         const val = StorageService.validateFile(f);
         if (!val.isValid) {
-          setErrorMsg(val.errorMessage || 'File exceeds 50MB limit.');
+          setErrorMsg(val.errorMessage || 'Invalid file format or size.');
           return;
         }
+        // Avoid adding duplicate files
+        if (!files.some((existing) => existing.name === f.name && existing.size === f.size)) {
+          validFiles.push(f);
+        }
       }
-      setFiles((prev) => [...prev, ...selected]);
+
+      setFiles((prev) => [...prev, ...validFiles]);
       setErrorMsg(null);
+      // Reset input value so same file can be re-selected if removed
+      e.target.value = '';
     }
   };
 
@@ -65,43 +88,69 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
     e.preventDefault();
     if (!user || !team) return;
     if (!title.trim() || !description.trim()) {
-      setErrorMsg('Please enter both title and description.');
+      setErrorMsg('Please enter both deliverable title and description.');
       return;
     }
 
     setLoading(true);
+    setUploadProgress(10);
     setErrorMsg(null);
+
+    let createdContribId: number | null = null;
+    const uploadedPaths: string[] = [];
+
     try {
-      // 1. Submit contribution row
+      // 1. Submit contribution row in Supabase
       const contrib = await ContributionService.submit({
         teamId: team.id,
         authorId: user.id,
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         links,
       });
+      createdContribId = contrib.id;
+      setUploadProgress(30);
 
-      // 2. Upload any attached proof files
-      for (const file of files) {
-        await StorageService.uploadProof({
+      // 2. Upload any attached proof files with progress feedback
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const uploadedFile = await StorageService.uploadProof({
           teamId: team.id,
           contributionId: contrib.id,
           file,
         });
+        uploadedPaths.push(uploadedFile.storagePath);
+        const currentProgress = 30 + Math.round(((i + 1) / files.length) * 65);
+        setUploadProgress(currentProgress);
       }
 
-      showToast('Contribution submitted for review! ✨', 'success');
+      setUploadProgress(100);
+      showToast('Deliverable submitted for review! ✨', 'success');
       onSuccess();
       onClose();
-      // Reset form
+
+      // Reset form on success
       setTitle('');
       setDescription('');
       setLinks([]);
       setFiles([]);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to submit contribution.');
+      console.error('[SubmitContribution] Upload failed, executing atomic rollback:', err);
+
+      // ATOMIC ROLLBACK: Purge orphaned storage files & delete the contribution row
+      if (uploadedPaths.length > 0) {
+        await StorageService.removeProofs(uploadedPaths).catch(() => {});
+      }
+      if (createdContribId) {
+        await ContributionService.deleteContribution(createdContribId, user.id).catch(() => {});
+      }
+
+      setErrorMsg(
+        err?.message || 'File upload failed. Submission was rolled back to prevent incomplete records.'
+      );
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -228,13 +277,15 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
               Click or drag files to upload proofs
             </span>
             <span style={{ fontSize: 11, color: '#7992A1', marginTop: 2 }}>
-              Supports PDFs, Word docs, code archives, demo videos, and images
+              Supports PDFs, Word docs (.doc, .docx), slides (.ppt, .pptx), media (.mp4, .mov, .mkv), and images (.png, .jpg)
             </span>
             <input
               type="file"
               multiple
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.mov,.mkv,.jpg,.jpeg,.png"
               onChange={handleFileChange}
               style={{ display: 'none' }}
+              disabled={loading}
             />
           </label>
 
@@ -252,30 +303,62 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
                     background: '#FFFFFF',
                     border: '1px solid #D5E8EF',
                     fontSize: 12,
+                    boxShadow: '0 2px 5px rgba(12, 64, 101, 0.04)',
                   }}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <FileText size={15} color="#0B4D88" /> {f.name} ({(f.size / (1024 * 1024)).toFixed(2)} MB)
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                    <FileCheck size={16} color="#0B4D88" />
+                    <span style={{ fontWeight: 650, color: '#102F48' }}>{f.name}</span>
+                    <span style={{ fontSize: 11, color: '#5E788C' }}>({StorageService.formatBytes(f.size)})</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(idx)}
-                    style={{ background: 'none', border: 'none', color: '#B34F5C', cursor: 'pointer' }}
-                  >
-                    <X size={14} />
-                  </button>
+                  {!loading && (
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      title="Remove file"
+                      style={{ background: 'none', border: 'none', color: '#B34F5C', cursor: 'pointer', padding: 2 }}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
+        {/* Upload Progress Bar */}
+        {loading && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: '#0B4D88', marginBottom: 4 }}>
+              <span>Uploading deliverables & evidence...</span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div style={{ width: '100%', height: 6, borderRadius: 99, background: '#D5E8EF', overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${uploadProgress}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #0B4D88, #22B6C5)',
+                  transition: 'width 0.2s ease',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-          <button type="button" onClick={onClose} className="btn">
+          <button type="button" onClick={onClose} disabled={loading} className="btn">
             Cancel
           </button>
-          <button type="submit" disabled={loading} className="btn btn-primary">
-            {loading ? 'Submitting...' : 'Submit for Review ↗'}
+          <button type="submit" disabled={loading} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {loading ? (
+              <>
+                <Loader2 size={15} className="spin" /> Submitting...
+              </>
+            ) : (
+              'Submit for Review ↗'
+            )}
           </button>
         </div>
       </form>

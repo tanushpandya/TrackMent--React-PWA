@@ -1,8 +1,9 @@
-import React from 'react';
-import { Award, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Award, ShieldCheck, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { TeamEvaluation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { AppCard } from './AppCard';
+import { LargestRemainderAllocator } from '../../utils/largestRemainderAllocator';
 
 interface StudentAcademicMarksCardProps {
   evaluations: TeamEvaluation[];
@@ -15,6 +16,7 @@ export const StudentAcademicMarksCard: React.FC<StudentAcademicMarksCardProps> =
   loading = false,
 }) => {
   const { user, profile } = useAuth();
+  const [expandedEvId, setExpandedEvId] = useState<number | null>(null);
 
   // 1. Filter out internal system records (e.g. __MARKS_VISIBILITY__)
   const cleanEvals = (evaluations || []).filter((e) => {
@@ -57,7 +59,10 @@ export const StudentAcademicMarksCard: React.FC<StudentAcademicMarksCardProps> =
         ? Number(ev.memberMarks[profile.usn])
         : Number(ev.totalMarks || 0);
 
-    const maxMarks = Number(ev.maxMarks || (normKey.includes('1') ? 50 : 100));
+    const maxMarks = Number(
+      ev.maxMarks ||
+        (normKey.includes('1') ? 40 : normKey.includes('2') ? 60 : normKey.includes('3') ? 100 : 50)
+    );
 
     const existing = phaseMap.get(normKey);
     if (!existing) {
@@ -105,6 +110,10 @@ export const StudentAcademicMarksCard: React.FC<StudentAcademicMarksCardProps> =
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {items.map(({ ev, score, maxMarks }) => {
             const pct = maxMarks > 0 ? ((score / maxMarks) * 100).toFixed(0) : '0';
+            const hasRubrics = ev.rubricScores && Object.keys(ev.rubricScores).length > 0;
+            const isExpanded = expandedEvId === ev.id;
+            const phaseNum = LargestRemainderAllocator.resolvePhaseNumber(ev.phaseName);
+            const criteria = LargestRemainderAllocator.getCriteriaForPhase(phaseNum);
 
             return (
               <div
@@ -115,42 +124,117 @@ export const StudentAcademicMarksCard: React.FC<StudentAcademicMarksCardProps> =
                   background: '#FFFFFF',
                   border: '1px solid #D5E8EF',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: 12,
+                  flexDirection: 'column',
+                  gap: 10,
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 850, color: '#102F48' }}>
-                      {ev.phaseName}
-                    </span>
-                    <span className="badge badge-confirmed">
-                      {score} / {maxMarks} Marks
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#7992A1', marginTop: 3 }}>
-                    Evaluated by {ev.evaluatorName || 'Faculty Mentor'}
-                    {ev.createdAt && (
-                      <>
-                        {' · '}
-                        {new Date(ev.createdAt).toLocaleDateString([], {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 850, color: '#102F48' }}>
+                        {ev.phaseName}
+                      </span>
+                      <span className="badge badge-confirmed">
+                        {score} / {maxMarks} Marks
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#7992A1', marginTop: 3 }}>
+                      Evaluated by {ev.evaluatorName || 'Faculty Mentor'}
+                      {ev.createdAt && (
+                        <>
+                          {' · '}
+                          {new Date(ev.createdAt).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </>
+                      )}
+                    </div>
+                    {ev.remarks && (
+                      <div style={{ fontSize: 12.5, color: '#31566E', marginTop: 6 }}>
+                        "{ev.remarks}"
+                      </div>
                     )}
                   </div>
-                  {ev.remarks && (
-                    <div style={{ fontSize: 12.5, color: '#31566E', marginTop: 6 }}>
-                      "{ev.remarks}"
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: '#0B4D88' }}>
+                      {pct}%
                     </div>
-                  )}
+                    {hasRubrics && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEvId(isExpanded ? null : ev.id)}
+                        style={{
+                          background: 'rgba(11, 77, 136, 0.08)',
+                          border: 'none',
+                          borderRadius: 8,
+                          padding: '6px 10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: '#0B4D88',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Sparkles size={12} />
+                        {isExpanded ? 'Hide Rubric' : 'View Rubric'}
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: '#0B4D88' }}>
-                  {pct}%
-                </div>
+
+                {/* Rubric Breakdown Drawer */}
+                {hasRubrics && isExpanded && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      padding: '10px 14px',
+                      background: '#F8FAFC',
+                      borderRadius: 10,
+                      border: '1px solid #E2E8F0',
+                    }}
+                  >
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 8 }}>
+                      Criteria-level Marks Breakdown:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+                      {criteria.map((c) => {
+                        const cScore = ev.rubricScores?.[c.key];
+                        if (cScore === undefined) return null;
+                        return (
+                          <div
+                            key={c.key}
+                            style={{
+                              background: '#FFFFFF',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '1px solid #E2E8F0',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <span style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>{c.label}</span>
+                            <span style={{ fontSize: 11.5, fontWeight: 800, color: '#0B4D88' }}>
+                              {cScore} / {c.maxMarks}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

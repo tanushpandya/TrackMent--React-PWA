@@ -15,6 +15,16 @@ export interface ProfileModel {
   facultyCode?: string;
 }
 
+export interface TeamReportModel {
+  slot: 'primary' | 'supplementary';
+  fileName: string;
+  storagePath: string;
+  fileSizeBytes: number;
+  description: string;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
 export interface TeamModel {
   id: number;
   teamCode: string;
@@ -28,6 +38,7 @@ export interface TeamModel {
   leaderId: string;
   mentorId?: string | null;
   currentProgressPct: number;
+  reports?: TeamReportModel[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -149,8 +160,22 @@ export interface TeamEvaluation {
   totalMarks: number;
   maxMarks: number;
   memberMarks: Record<string, number>;
+  rubricScores?: Record<string, any>;
   remarks?: string | null;
   createdAt: string;
+}
+
+export interface MilestoneModel {
+  id: string;
+  phaseNumber: number;
+  title: string;
+  description?: string;
+  weightPct: number;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  actualEndDate?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+  contributions?: ContributionModel[];
 }
 
 export interface TeamDeparture {

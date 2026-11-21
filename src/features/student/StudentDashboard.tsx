@@ -32,6 +32,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { MetricCard } from '../../components/common/MetricCard';
 import { AppCard } from '../../components/common/AppCard';
 import { StatusPill } from '../../components/common/StatusPill';
+import { ObjectivesChecklistWidget } from '../../components/dashboard/ObjectivesChecklistWidget';
 
 export const StudentDashboard: React.FC = () => {
   const { profile, isLead } = useAuth();
@@ -308,6 +309,17 @@ export const StudentDashboard: React.FC = () => {
         isMarksVisible={isMarksVisible}
         loading={loading}
       />
+
+      {/* Interactive Objectives Checklist */}
+      {team && (
+        <div style={{ marginBottom: 20 }}>
+          <ObjectivesChecklistWidget
+            team={team}
+            isLeader={isLead}
+            onUpdated={refreshTeam}
+          />
+        </div>
+      )}
 
       {/* 2-Column Grid: Recent Work & Mentor Guidance */}
       <div

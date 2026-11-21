@@ -35,6 +35,7 @@ import { MetricCard } from '../../components/common/MetricCard';
 import { AppCard } from '../../components/common/AppCard';
 import { StatusPill } from '../../components/common/StatusPill';
 import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
+import { ObjectivesChecklistWidget } from '../../components/dashboard/ObjectivesChecklistWidget';
 
 export const LeadDashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -288,6 +289,17 @@ export const LeadDashboard: React.FC = () => {
         isMarksVisible={isMarksVisible}
         loading={loading}
       />
+
+      {/* Interactive Objectives Checklist */}
+      {team && (
+        <div style={{ marginBottom: 20 }}>
+          <ObjectivesChecklistWidget
+            team={team}
+            isLeader={true}
+            onUpdated={refreshTeam}
+          />
+        </div>
+      )}
 
       {/* 2-Column: Review Queue Shortcut & Project Pulse */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 16 }}>

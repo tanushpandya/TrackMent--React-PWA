@@ -23,6 +23,7 @@ import { StatusPill } from '../../components/common/StatusPill';
 import { Modal } from '../../components/common/Modal';
 import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
 import { StudentAcademicMarksCard } from '../../components/common/StudentAcademicMarksCard';
+import { TeamReportSubmissionCard } from '../../components/common/TeamReportSubmissionCard';
 
 export const TeamInfoScreen: React.FC = () => {
   const { user, profile, isLead, isMentor } = useAuth();
@@ -274,6 +275,17 @@ export const TeamInfoScreen: React.FC = () => {
             </div>
           )}
         </AppCard>
+      )}
+
+      {/* Team Deliverables / Project Reports */}
+      {team && (
+        <div style={{ marginBottom: 20 }}>
+          <TeamReportSubmissionCard
+            team={team}
+            isLeader={Boolean(isLeader)}
+            onUpdated={refreshTeam}
+          />
+        </div>
       )}
 
       {/* 2. Faculty Mentor Card */}
