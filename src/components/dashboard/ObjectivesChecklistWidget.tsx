@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TeamModel } from '../../types';
 import { TeamService } from '../../services/team.service';
+import { AppCard } from '../common/AppCard';
 
 export interface ObjectiveChecklistItem {
   text: string;
@@ -123,147 +124,274 @@ export const ObjectivesChecklistWidget: React.FC<Props> = ({
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-md p-5 shadow-xl">
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <ListTodo className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              Objectives Checklist
-              {items.length > 0 && (
-                <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  {completedCount}/{items.length} Done ({progressPct}%)
-                </span>
-              )}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {isLeader
-                ? 'Check off milestones as your team achieves project deliverables'
-                : 'Project goals established and tracked by your team lead'}
-            </p>
-          </div>
-        </div>
-
-        {isSaving && (
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-            <span>Saving...</span>
-          </div>
-        )}
-      </div>
-
-      {/* Progress Bar */}
-      {items.length > 0 && (
-        <div className="mb-4">
-          <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden border border-white/5">
+    <AppCard
+      title="Objectives & Deliverables Checklist"
+      subtitle={
+        isLeader
+          ? 'Check off milestones as your team delivers project objectives.'
+          : 'Project goals established and tracked by your team lead.'
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Progress & Status Header Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10,
+            padding: '10px 14px',
+            background: '#F4FAFC',
+            borderRadius: 12,
+            border: '1px solid #D5E8EF',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 text-xs text-red-400">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Items List */}
-      <div className="space-y-2">
-        {items.length === 0 ? (
-          <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-slate-800/20">
-            <CheckCircle2 className="w-7 h-7 text-slate-500 mx-auto mb-1.5" />
-            <p className="text-xs text-slate-400">
-              No objectives recorded yet.{' '}
-              {isLeader ? 'Add your first project goal below!' : 'Team lead has not added milestones.'}
-            </p>
-          </div>
-        ) : (
-          items.map((item, idx) => (
-            <div
-              key={idx}
-              className={`group flex items-start justify-between gap-3 p-2.5 rounded-xl border transition-all ${
-                item.completed
-                  ? 'bg-slate-900/40 border-white/5 opacity-80'
-                  : 'bg-slate-800/40 border-white/10 hover:border-white/20'
-              }`}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: '#E5F3FA',
+                color: '#0B4D88',
+                display: 'grid',
+                placeItems: 'center',
+              }}
             >
-              <button
-                type="button"
-                onClick={() => handleToggle(idx)}
-                disabled={!isLeader || isSaving}
-                className={`flex items-start gap-2.5 text-left flex-1 min-w-0 ${
-                  isLeader ? 'cursor-pointer' : 'cursor-default'
-                }`}
-                title={isLeader ? 'Click to toggle' : 'Only team lead can toggle milestones'}
-              >
-                <span className="mt-0.5 flex-shrink-0">
-                  {item.completed ? (
-                    <CheckSquare className="w-4 h-4 text-emerald-400" />
-                  ) : (
-                    <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
-                  )}
-                </span>
-                <span
-                  className={`text-xs ${
-                    item.completed
-                      ? 'line-through text-slate-400'
-                      : 'text-slate-200 font-medium'
-                  }`}
-                >
-                  {item.text}
-                </span>
-              </button>
-
-              <div className="flex items-center gap-1">
-                {!isLeader && (
-                  <span title="Only team lead can modify" className="text-slate-600">
-                    <Lock className="w-3 h-3" />
-                  </span>
-                )}
-                {isLeader && (
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(idx)}
-                    disabled={isSaving}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition"
-                    title="Delete item"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+              <ListTodo size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#102F48' }}>
+                Milestone Progress
+              </div>
+              <div style={{ fontSize: 11, color: '#5E788C' }}>
+                {completedCount} of {items.length} tasks completed
               </div>
             </div>
-          ))
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {isSaving && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: '#0B4D88', fontWeight: 600 }}>
+                <Loader2 size={13} className="spin" />
+                Saving...
+              </span>
+            )}
+            <span
+              className="badge badge-confirmed"
+              style={{ fontSize: 12, fontWeight: 800, padding: '4px 10px' }}
+            >
+              {progressPct}% Done
+            </span>
+          </div>
+        </div>
+
+        {/* Progress Fill Bar */}
+        {items.length > 0 && (
+          <div
+            style={{
+              width: '100%',
+              height: 7,
+              borderRadius: 99,
+              background: '#D5E8EF',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${progressPct}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #0B4D88, #22B6C5)',
+                borderRadius: 99,
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Error notification */}
+        {errorMsg && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: '#FBECEB',
+              border: '1px solid rgba(179, 79, 92, 0.3)',
+              color: '#B34F5C',
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+          >
+            <AlertCircle size={16} />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Items Checklist List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.length === 0 ? (
+            <div
+              style={{
+                padding: '24px 16px',
+                textAlign: 'center',
+                borderRadius: 12,
+                border: '1px dashed #D5E8EF',
+                background: '#FFFFFF',
+                color: '#5E788C',
+                fontSize: 13,
+              }}
+            >
+              <CheckCircle2 size={28} color="#7992A1" style={{ margin: '0 auto 8px' }} />
+              <div>No checklist objectives recorded yet.</div>
+              {isLeader && (
+                <div style={{ fontSize: 11.5, color: '#0B4D88', marginTop: 4, fontWeight: 600 }}>
+                  Add your first project milestone using the input below!
+                </div>
+              )}
+            </div>
+          ) : (
+            items.map((item, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  border: item.completed ? '1px solid #E2E8F0' : '1px solid #D5E8EF',
+                  background: item.completed ? '#F8FAFC' : '#FFFFFF',
+                  boxShadow: '0 2px 6px rgba(12, 64, 101, 0.04)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div
+                  onClick={() => handleToggle(idx)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    flex: 1,
+                    minWidth: 0,
+                    cursor: isLeader && !isSaving ? 'pointer' : 'default',
+                    userSelect: 'none',
+                  }}
+                  title={isLeader ? 'Click to toggle completion' : 'Read-only milestone'}
+                >
+                  <div style={{ marginTop: 2, flexShrink: 0 }}>
+                    {item.completed ? (
+                      <CheckSquare size={18} color="#16A34A" />
+                    ) : (
+                      <Square size={18} color="#7992A1" />
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.55,
+                      color: item.completed ? '#7992A1' : '#102F48',
+                      textDecoration: item.completed ? 'line-through' : 'none',
+                      fontWeight: item.completed ? 500 : 600,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {item.text}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: 2 }}>
+                  {!isLeader && (
+                    <span title="Editable by Team Lead" style={{ color: '#7992A1' }}>
+                      <Lock size={14} />
+                    </span>
+                  )}
+                  {isLeader && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(idx)}
+                      disabled={isSaving}
+                      title="Remove objective"
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 6,
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#7992A1',
+                        display: 'grid',
+                        placeItems: 'center',
+                        cursor: 'pointer',
+                        transition: 'color 0.15s, background 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#B34F5C';
+                        e.currentTarget.style.background = '#FBECEB';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#7992A1';
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Add New Milestone Form (Team Lead Only) */}
+        {isLeader && (
+          <form
+            onSubmit={handleAdd}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 6,
+            }}
+          >
+            <input
+              type="text"
+              value={newText}
+              onChange={(e) => setNewText(e.target.value)}
+              disabled={isSaving}
+              placeholder="Add a new milestone or deliverable..."
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: 12,
+                border: '1.5px solid #D5E8EF',
+                background: '#FFFFFF',
+                fontSize: 13,
+                color: '#102F48',
+                outline: 'none',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={isSaving || !newText.trim()}
+              className="btn btn-primary btn-sm"
+              style={{
+                height: 38,
+                padding: '0 16px',
+                borderRadius: 12,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Plus size={16} />
+              <span>Add</span>
+            </button>
+          </form>
         )}
       </div>
-
-      {/* Add New Item Input (Leader Only) */}
-      {isLeader && (
-        <form onSubmit={handleAdd} className="mt-4 flex items-center gap-2">
-          <input
-            type="text"
-            value={newText}
-            onChange={(e) => setNewText(e.target.value)}
-            disabled={isSaving}
-            placeholder="Add a new milestone or objective..."
-            className="flex-1 rounded-xl border border-white/10 bg-slate-800/80 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-          <button
-            type="submit"
-            disabled={isSaving || !newText.trim()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add</span>
-          </button>
-        </form>
-      )}
-    </div>
+    </AppCard>
   );
 };
