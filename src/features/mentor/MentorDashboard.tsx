@@ -52,6 +52,7 @@ export const MentorDashboard: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'recent'>('name');
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'gantt'>('cards');
+  const [selectedGanttTeamId, setSelectedGanttTeamId] = useState<number | undefined>(undefined);
 
   // Debounce search query to eliminate unnecessary re-filtering on every keystroke
   useEffect(() => {
@@ -617,7 +618,11 @@ export const MentorDashboard: React.FC = () => {
         </AppCard>
       ) : viewMode === 'gantt' ? (
         <div style={{ marginBottom: '40px' }}>
-          <MentorGanttChart teams={sortedTeams} />
+          <MentorGanttChart
+            teams={sortedTeams}
+            selectedTeamId={selectedGanttTeamId}
+            onSelectTeam={setSelectedGanttTeamId}
+          />
         </div>
       ) : (
         <div
