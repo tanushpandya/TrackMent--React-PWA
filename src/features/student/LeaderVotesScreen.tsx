@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Vote, CheckCircle, XCircle, ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
@@ -78,6 +78,25 @@ export const LeaderVotesScreen: React.FC = () => {
 
   const isLeader = team && user && team.leaderId === user.id;
 
+  // Single-pass O(V) index map converting O(C * V) nested scan to O(C + V)
+  const votesSummaryByContribId = useMemo(() => {
+    const map = new Map<number, { confirms: number; rejects: number; myVote: ContributionVote | null }>();
+    const uid = user?.id;
+
+    for (let i = 0; i < votes.length; i++) {
+      const v = votes[i];
+      let entry = map.get(v.contributionId);
+      if (!entry) {
+        entry = { confirms: 0, rejects: 0, myVote: null };
+        map.set(v.contributionId, entry);
+      }
+      if (v.verdict === 'CONFIRMED') entry.confirms++;
+      if (v.verdict === 'REJECTED') entry.rejects++;
+      if (uid && v.voterId === uid) entry.myVote = v;
+    }
+    return map;
+  }, [votes, user?.id]);
+
   return (
     <div style={{ animation: 'pageIn 0.35s ease both' }}>
       <PageHeader
@@ -104,10 +123,8 @@ export const LeaderVotesScreen: React.FC = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {leadContributions.map((c) => {
-              const contribVotes = votes.filter((v) => v.contributionId === c.id);
-              const confirms = contribVotes.filter((v) => v.verdict === 'CONFIRMED').length;
-              const rejects = contribVotes.filter((v) => v.verdict === 'REJECTED').length;
-              const myVote = user ? contribVotes.find((v) => v.voterId === user.id) : null;
+              const summary = votesSummaryByContribId.get(c.id) || { confirms: 0, rejects: 0, myVote: null };
+              const { confirms, rejects, myVote } = summary;
 
               return (
                 <div

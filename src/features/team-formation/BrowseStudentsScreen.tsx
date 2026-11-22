@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -145,12 +145,18 @@ export const BrowseStudentsScreen: React.FC = () => {
     navigate('/team-formation/create-team');
   };
 
-  const filteredStudents = students.filter((s) => {
-    if (selectedSemester !== 'All' && s.semester?.toString() !== selectedSemester) {
-      return false;
-    }
-    return true;
-  });
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      if (selectedSemester !== 'All' && s.semester?.toString() !== selectedSemester) {
+        return false;
+      }
+      return true;
+    });
+  }, [students, selectedSemester]);
+
+  // Precomputed O(1) lookup sets to eliminate O(N * K + N * I) quadratic scan in render loop
+  const selectedStudentIds = useMemo(() => new Set(selectedInCreation.map((s) => s.id)), [selectedInCreation]);
+  const invitedStudentIds = useMemo(() => new Set(sentInvites.map((inv) => inv.studentId)), [sentInvites]);
 
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px 40px' }}>
@@ -329,8 +335,8 @@ export const BrowseStudentsScreen: React.FC = () => {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
           {filteredStudents.map((student) => {
-            const isSelected = selectedInCreation.some((s) => s.id === student.id);
-            const isInvited = sentInvites.some((inv) => inv.studentId === student.id);
+            const isSelected = selectedStudentIds.has(student.id);
+            const isInvited = invitedStudentIds.has(student.id);
             const isActing = actingStudentId === student.id;
 
             return (

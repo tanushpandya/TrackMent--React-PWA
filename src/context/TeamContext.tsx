@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { TeamService } from '../services/team.service';
 import { AuthService } from '../services/auth.service';
@@ -16,12 +16,14 @@ interface TeamContextType {
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, isMentor } = useAuth();
+  const { user, isMentor } = useAuth();
+  const userId = user?.id;
 
-  // Instant pre-hydration from sessionStorage: eliminates the 500ms initial wait waterfall
+  // Instant pre-hydration from sessionStorage scoped to current user ID
   const [team, setTeam] = useState<TeamModel | null>(() => {
+    if (!userId) return null;
     try {
-      const stored = sessionStorage.getItem('trackment_cached_team');
+      const stored = sessionStorage.getItem(`trackment_cached_team_${userId}`);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -29,8 +31,9 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [members, setMembers] = useState<ProfileModel[]>(() => {
+    if (!userId) return [];
     try {
-      const stored = sessionStorage.getItem('trackment_cached_members');
+      const stored = sessionStorage.getItem(`trackment_cached_members_${userId}`);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -38,8 +41,9 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [mentor, setMentor] = useState<ProfileModel | null>(() => {
+    if (!userId) return null;
     try {
-      const stored = sessionStorage.getItem('trackment_cached_mentor');
+      const stored = sessionStorage.getItem(`trackment_cached_mentor_${userId}`);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -48,37 +52,40 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [loading, setLoading] = useState<boolean>(() => !team);
   const isFirstFetch = useRef(true);
+  const activeTeamRef = useRef<TeamModel | null>(team);
+  activeTeamRef.current = team;
 
-  const saveCache = (t: TeamModel | null, m: ProfileModel[], men: ProfileModel | null) => {
+  const saveCache = useCallback((uid: string | undefined, t: TeamModel | null, m: ProfileModel[], men: ProfileModel | null) => {
+    if (!uid) return;
     try {
       if (t) {
-        sessionStorage.setItem('trackment_cached_team', JSON.stringify(t));
-        sessionStorage.setItem('trackment_cached_members', JSON.stringify(m));
-        sessionStorage.setItem('trackment_cached_mentor', JSON.stringify(men));
+        sessionStorage.setItem(`trackment_cached_team_${uid}`, JSON.stringify(t));
+        sessionStorage.setItem(`trackment_cached_members_${uid}`, JSON.stringify(m));
+        sessionStorage.setItem(`trackment_cached_mentor_${uid}`, JSON.stringify(men));
       } else {
-        sessionStorage.removeItem('trackment_cached_team');
-        sessionStorage.removeItem('trackment_cached_members');
-        sessionStorage.removeItem('trackment_cached_mentor');
+        sessionStorage.removeItem(`trackment_cached_team_${uid}`);
+        sessionStorage.removeItem(`trackment_cached_members_${uid}`);
+        sessionStorage.removeItem(`trackment_cached_mentor_${uid}`);
       }
     } catch (_) {}
-  };
+  }, []);
 
   const loadTeamData = useCallback(async (isSilent = false) => {
-    if (!user || isMentor) {
+    if (!userId || isMentor) {
       setTeam(null);
       setMembers([]);
       setMentor(null);
       setLoading(false);
-      saveCache(null, [], null);
+      saveCache(userId, null, [], null);
       return;
     }
 
     try {
       // Only show full-screen skeleton if there is NO cached team available
-      if (!isSilent && isFirstFetch.current && !team) {
+      if (!isSilent && isFirstFetch.current && !activeTeamRef.current) {
         setLoading(true);
       }
-      const myTeam = await TeamService.fetchMyTeam(user.id);
+      const myTeam = await TeamService.fetchMyTeam(userId);
       setTeam(myTeam);
 
       if (myTeam) {
@@ -88,11 +95,11 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ]);
         setMembers(roster);
         setMentor(mentorProfile);
-        saveCache(myTeam, roster, mentorProfile);
+        saveCache(userId, myTeam, roster, mentorProfile);
       } else {
         setMembers([]);
         setMentor(null);
-        saveCache(null, [], null);
+        saveCache(userId, null, [], null);
       }
     } catch (e) {
       console.error('Error loading team data:', e);
@@ -100,18 +107,17 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isFirstFetch.current = false;
       setLoading(false);
     }
-  }, [user?.id, isMentor, team]);
+  }, [userId, isMentor, saveCache]);
 
   useEffect(() => {
     loadTeamData(false);
   }, [loadTeamData]);
 
   // Realtime updates subscription (runs silently without UI unmount)
-  const currentUserId = user?.id;
   useEffect(() => {
-    if (!currentUserId || isMentor) return;
+    if (!userId || isMentor) return;
 
-    const channelName = `realtime:team_context_${currentUserId}`;
+    const channelName = `realtime:team_context_${userId}`;
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, () => {
@@ -128,18 +134,25 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUserId, isMentor, loadTeamData]);
+  }, [userId, isMentor, loadTeamData]);
+
+  const refreshTeam = useCallback(async () => {
+    await loadTeamData(false);
+  }, [loadTeamData]);
+
+  const contextValue = useMemo<TeamContextType>(
+    () => ({
+      team,
+      members,
+      mentor,
+      loading,
+      refreshTeam,
+    }),
+    [team, members, mentor, loading, refreshTeam]
+  );
 
   return (
-    <TeamContext.Provider
-      value={{
-        team,
-        members,
-        mentor,
-        loading,
-        refreshTeam: () => loadTeamData(false),
-      }}
-    >
+    <TeamContext.Provider value={contextValue}>
       {children}
     </TeamContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
@@ -48,16 +48,18 @@ export const StudentDashboard: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const teamId = team?.id;
+
   const loadDashboardData = useCallback(async () => {
-    if (!team) return;
+    if (!teamId) return;
     try {
       setLoading(true);
       const [contribs, meeting, feedback, evals, vis] = await Promise.all([
-        ContributionService.fetchForTeam(team.id),
-        AppointmentService.fetchUpcomingForTeam(team.id),
-        FeedbackService.fetchForTeam(team.id),
-        TeamService.fetchTeamEvaluations(team.id),
-        TeamService.fetchMarksVisibility(team.id),
+        ContributionService.fetchForTeam(teamId),
+        AppointmentService.fetchUpcomingForTeam(teamId),
+        FeedbackService.fetchForTeam(teamId),
+        TeamService.fetchTeamEvaluations(teamId),
+        TeamService.fetchMarksVisibility(teamId),
       ]);
       setContributions(contribs);
       setUpcomingMeeting(meeting);
@@ -69,7 +71,7 @@ export const StudentDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [team]);
+  }, [teamId]);
 
   useEffect(() => {
     loadDashboardData();
@@ -91,9 +93,18 @@ export const StudentDashboard: React.FC = () => {
   };
 
   const firstName = profile?.fullName?.split(' ')[0] || 'Student';
-  const pendingReviews = contributions.filter((c) => c.status === 'PENDING').length;
-  const acceptedContributions = contributions.filter((c) => c.status === 'CONFIRMED').length;
-  const meetMeNotice = feedbackList.find((f) => f.feedbackType === 'MEET_ME');
+
+  // Single-pass memoized aggregation of dashboard counts
+  const { pendingReviews, acceptedContributions, meetMeNotice } = useMemo(() => {
+    let pending = 0;
+    let accepted = 0;
+    for (let i = 0; i < contributions.length; i++) {
+      if (contributions[i].status === 'PENDING') pending++;
+      else if (contributions[i].status === 'CONFIRMED') accepted++;
+    }
+    const meetMe = feedbackList.find((f) => f.feedbackType === 'MEET_ME');
+    return { pendingReviews: pending, acceptedContributions: accepted, meetMeNotice: meetMe };
+  }, [contributions, feedbackList]);
 
   return (
     <div style={{ animation: 'pageIn 0.35s ease both' }}>
