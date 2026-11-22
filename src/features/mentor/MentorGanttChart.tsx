@@ -280,39 +280,23 @@ export const MentorGanttChart: React.FC<Props> = ({
     };
   }, [selectedContribution]);
 
-  // Institutional Milestone Calculation with Asia/Kolkata timezone and validated creation timestamp
+  // Institutional Milestone Calculation with Asia/Kolkata timezone and canonical academic calendar
   const { milestones, scheduleUnavailable, rawDeliverables } = useMemo(() => {
     if (!activeTeam) {
       return { milestones: [], scheduleUnavailable: true, rawDeliverables: [] };
     }
 
-    const teamCreatedTime = activeTeam.createdAt ? Date.parse(activeTeam.createdAt) : NaN;
-    const isScheduleAvailable = !Number.isNaN(teamCreatedTime);
-
-    let p1Start: Date;
-    let p1End: Date;
-    let p2Start: Date;
-    let p2End: Date;
-    let p3Start: Date;
-    let p3End: Date;
-
-    if (isScheduleAvailable) {
-      // Anchored strictly to team registration timestamp in India Standard Time
-      p1Start = new Date(teamCreatedTime);
-      p1End = new Date(p1Start.getTime() + 25 * 86400000);
-      p2Start = new Date(p1End.getTime() + 1 * 86400000);
-      p2End = new Date(p2Start.getTime() + 35 * 86400000);
-      p3Start = new Date(p2End.getTime() + 1 * 86400000);
-      p3End = new Date(p3Start.getTime() + 30 * 86400000);
-    } else {
-      // Unavailable schedule: Use placeholder invalid dates without moving day-by-day drifts
-      p1Start = new Date(NaN);
-      p1End = new Date(NaN);
-      p2Start = new Date(NaN);
-      p2End = new Date(NaN);
-      p3Start = new Date(NaN);
-      p3End = new Date(NaN);
-    }
+    // Canonical Institutional Calendar Schedule (RVCE Experiential Learning 2026)
+    // Phase 1: 7th Sept 2026 to 30th Sept 2026
+    // Phase 2: 1st Oct 2026 to 30th Oct 2026
+    // Phase 3: 31st Oct 2026 to 3rd Dec 2026
+    const p1Start = new Date('2026-09-07T00:00:00+05:30');
+    const p1End = new Date('2026-09-30T23:59:59.999+05:30');
+    const p2Start = new Date('2026-10-01T00:00:00+05:30');
+    const p2End = new Date('2026-10-30T23:59:59.999+05:30');
+    const p3Start = new Date('2026-10-31T00:00:00+05:30');
+    const p3End = new Date('2026-12-03T23:59:59.999+05:30');
+    const isScheduleAvailable = true;
 
     const p1Contribs: ContributionModel[] = [];
     const p2Contribs: ContributionModel[] = [];
@@ -324,8 +308,8 @@ export const MentorGanttChart: React.FC<Props> = ({
       const c = contributions[i];
       const classified = classifyDeliverable(
         c,
-        isScheduleAvailable ? p1End : null,
-        isScheduleAvailable ? p2End : null
+        p1End,
+        p2End
       );
       classifiedList.push(classified);
 

@@ -61,22 +61,22 @@ console.log('Running Gantt Timeline & Evidence Matrix QA Verification Suite...\n
 // Test 1: P1 Fix - Explicitly labeled evidence counting toward wrong phase
 // -------------------------------------------------------------
 {
-  const p1End = new Date('2026-11-20T18:29:59.999Z');
-  const p2End = new Date('2026-12-26T18:29:59.999Z');
+  const p1End = new Date('2026-09-30T23:59:59.999+05:30');
+  const p2End = new Date('2026-10-30T23:59:59.999+05:30');
 
-  // Submissions submitted on Nov 5, 2026 (during Phase 1 date window)
+  // Submissions submitted on Sept 15, 2026 (during Phase 1 date window)
   const submissionP3Report = {
     id: 101,
     title: 'Phase 3 final report',
     description: 'Submitted final documentation early',
-    createdAt: '2026-11-05T10:00:00.000Z',
+    createdAt: '2026-09-15T10:00:00.000Z',
     status: 'CONFIRMED',
   };
   const submissionP3Demo = {
     id: 102,
     title: 'Phase 3 final demo',
     description: 'Video presentation demo',
-    createdAt: '2026-11-05T10:30:00.000Z',
+    createdAt: '2026-09-15T10:30:00.000Z',
     status: 'CONFIRMED',
   };
 
@@ -93,20 +93,19 @@ console.log('Running Gantt Timeline & Evidence Matrix QA Verification Suite...\n
 // Test 2: Broad keywords do NOT falsely trigger Phase assignments
 // -------------------------------------------------------------
 {
-  const p1End = new Date('2026-11-20T18:29:59.999Z');
-  const p2End = new Date('2026-12-26T18:29:59.999Z');
+  const p1End = new Date('2026-09-30T23:59:59.999+05:30');
+  const p2End = new Date('2026-10-30T23:59:59.999+05:30');
 
   // Generic bug fixes or general tasks submitted during Phase 2
   const taskInP2 = {
     id: 103,
     title: 'Fixed problem with database connection pool',
     description: 'Minor bug resolution',
-    createdAt: '2026-11-28T10:00:00.000Z', // In Phase 2 date window
+    createdAt: '2026-10-15T10:00:00.000Z', // In Phase 2 date window (Oct 1 to Oct 30)
     status: 'CONFIRMED',
   };
 
   const res = classifyDeliverable(taskInP2, p1End, p2End);
-  // In the old code, "problem" caused it to go to Phase 1 even though submitted in Phase 2!
   assert.equal(res.phase, 2, 'Standalone "problem" must NOT force item into Phase 1');
   assert.equal(res.reason, 'DATE_WINDOW');
   console.log('✓ TEST 2 PASSED: Broad keywords ("problem", "module", etc.) do not falsely bias phase assignment');
@@ -197,21 +196,35 @@ console.log('Running Gantt Timeline & Evidence Matrix QA Verification Suite...\n
 }
 
 // -------------------------------------------------------------
-// Test 5: Stable Schedule Calculation vs Missing Creation Timestamp
+// Test 5: Canonical Academic Calendar Schedule Dates
 // -------------------------------------------------------------
 {
-  const missingCreatedDate = undefined;
-  const isScheduleAvailable = missingCreatedDate ? !Number.isNaN(Date.parse(missingCreatedDate)) : false;
-  assert.equal(isScheduleAvailable, false, 'Missing registration timestamp cleanly marks schedule unavailable');
+  const p1Start = new Date('2026-09-07T00:00:00+05:30');
+  const p1End = new Date('2026-09-30T23:59:59.999+05:30');
+  const p2Start = new Date('2026-10-01T00:00:00+05:30');
+  const p2End = new Date('2026-10-30T23:59:59.999+05:30');
+  const p3Start = new Date('2026-10-31T00:00:00+05:30');
+  const p3End = new Date('2026-12-03T23:59:59.999+05:30');
 
-  const validDate = '2026-10-26T00:00:00.000Z';
-  const startMs = Date.parse(validDate);
-  const p1EndMs = startMs + 25 * 86400000;
-  const p2EndMs = p1EndMs + 1 * 86400000 + 35 * 86400000;
-  const p3EndMs = p2EndMs + 1 * 86400000 + 30 * 86400000;
+  // Verify Phase 1: 7th Sept to 30th Sept 2026
+  assert.equal(p1Start.getDate(), 7);
+  assert.equal(p1Start.getMonth(), 8); // 8 = Sept (0-indexed)
+  assert.equal(p1End.getDate(), 30);
+  assert.equal(p1End.getMonth(), 8);
 
-  assert.equal(new Date(p1EndMs).toISOString().startsWith('2026-11-20'), true);
-  console.log('✓ TEST 5 PASSED: Fixed institutional timeline derived from team creation timestamp without moving day-to-day drift');
+  // Verify Phase 2: 1st Oct to 30th Oct 2026
+  assert.equal(p2Start.getDate(), 1);
+  assert.equal(p2Start.getMonth(), 9); // 9 = Oct
+  assert.equal(p2End.getDate(), 30);
+  assert.equal(p2End.getMonth(), 9);
+
+  // Verify Phase 3: 31st Oct to 3rd Dec 2026
+  assert.equal(p3Start.getDate(), 31);
+  assert.equal(p3Start.getMonth(), 9);
+  assert.equal(p3End.getDate(), 3);
+  assert.equal(p3End.getMonth(), 11); // 11 = Dec
+
+  console.log('✓ TEST 5 PASSED: Fixed institutional timeline canonical dates verified (Phase 1: 7-30 Sep, Phase 2: 1-30 Oct, Phase 3: 31 Oct - 3 Dec)');
 }
 
 console.log('\n=============================================================');
