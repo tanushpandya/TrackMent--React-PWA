@@ -155,17 +155,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
           }}
         >
           <Bell size={17} />
-          <span
-            style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: '#FF9A6F',
-            }}
-          />
         </button>
 
         {/* Profile Avatar Button */}

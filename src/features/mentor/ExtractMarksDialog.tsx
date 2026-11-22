@@ -192,6 +192,18 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
   const handleDownloadCsv = () => {
     if (rows.length === 0) return;
 
+    const sanitizeCsvCell = (value: any): string => {
+      if (value === null || value === undefined) return '""';
+      let str = String(value);
+      // Neutralize CSV formula injection by prepending single quote
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = "'" + str;
+      }
+      // Escape embedded double-quotes by doubling them per RFC 4180
+      str = str.replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
     const headers = [
       'Team Code',
       'Team Name',
@@ -203,7 +215,7 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
       'Phase 3',
       'Total Marks',
       'Email',
-    ];
+    ].map(sanitizeCsvCell);
 
     const csvRows = filteredRows.map((r) => {
       const total =
@@ -212,16 +224,16 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
           : '';
 
       return [
-        `"${r.teamCode}"`,
-        `"${r.teamName}"`,
-        `"${r.studentName}"`,
-        `"${r.usn}"`,
-        `"${r.isLead ? 'Team Lead' : 'Member'}"`,
+        sanitizeCsvCell(r.teamCode),
+        sanitizeCsvCell(r.teamName),
+        sanitizeCsvCell(r.studentName),
+        sanitizeCsvCell(r.usn),
+        sanitizeCsvCell(r.isLead ? 'Team Lead' : 'Member'),
         r.phase1 !== null ? r.phase1 : '',
         r.phase2 !== null ? r.phase2 : '',
         r.phase3 !== null ? r.phase3 : '',
         total,
-        `"${r.email}"`,
+        sanitizeCsvCell(r.email),
       ].join(',');
     });
 

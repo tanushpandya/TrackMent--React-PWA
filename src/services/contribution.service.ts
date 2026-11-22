@@ -132,7 +132,6 @@ export class ContributionService {
   }
 
   static async deleteContribution(contributionId: number, authorId: string): Promise<void> {
-    fastCache.invalidate('contribs_');
     // 1. Collect files to delete
     let paths: string[] = [];
     try {
@@ -143,22 +142,31 @@ export class ContributionService {
       paths = (files || []).map((f: any) => f.storage_path).filter(Boolean);
     } catch (_) {}
 
-    // 2. Delete contribution row
-    const { error } = await supabase
+    // 2. Delete contribution row (only allowed if PENDING and owned by author)
+    const { data: deletedRows, error } = await supabase
       .from('contributions')
       .delete()
       .eq('id', contributionId)
       .eq('author_id', authorId)
-      .eq('status', 'PENDING');
+      .eq('status', 'PENDING')
+      .select('id');
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
-    // 3. Remove storage objects
+    if (!deletedRows || deletedRows.length === 0) {
+      throw new Error('Unable to delete contribution: it may already be reviewed or does not belong to you.');
+    }
+
+    // 3. Remove storage objects only after database delete succeeded
     if (paths.length > 0) {
       try {
         await supabase.storage.from(PROOFS_BUCKET).remove(paths);
       } catch (_) {}
     }
+
+    fastCache.invalidate('contribs_');
   }
 
   private static mapContribution(raw: any): ContributionModel {

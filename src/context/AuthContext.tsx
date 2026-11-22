@@ -5,7 +5,7 @@ import { AuthService } from '../services/auth.service';
 import { fastCache } from '../utils/cache';
 import { ProfileModel, Role } from '../types';
 
-export type AuthStatus = 'loading' | 'newUser' | 'ready' | 'guest';
+export type AuthStatus = 'loading' | 'newUser' | 'ready' | 'guest' | 'error';
 
 interface AuthContextType {
   status: AuthStatus;
@@ -15,9 +15,11 @@ interface AuthContextType {
   isLead: boolean;
   isStudent: boolean;
   role: Role | null;
+  authError?: string | null;
   signInWithPassword: (email: string, pass: string) => Promise<ProfileModel | null>;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
+  retryAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileModel | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // References to prevent unnecessary re-renders on tab switch / visibility changes
   const activeUserRef = useRef<User | null>(null);
@@ -34,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   activeProfileRef.current = profile;
 
   const resolveSession = useCallback(async (currentUser: User | null) => {
+    setAuthError(null);
     if (!currentUser) {
       setUser(null);
       setProfile(null);
@@ -60,12 +64,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStatus('ready');
         return;
       }
-    } catch (e) {
-      console.error('Error loading profile:', e);
+      // If prof is null without throwing error, user has no profile row yet
+      setProfile(null);
+      setStatus('newUser');
+    } catch (e: any) {
+      console.error('Error loading profile (backend/network failure):', e);
+      // QA-004 Fix: Do NOT send existing user to onboarding form on network failure!
+      setAuthError(e?.message || 'Network connection failed. Unable to verify user profile.');
+      setStatus('error');
     }
-
-    setProfile(null);
-    setStatus('newUser');
   }, []);
 
   useEffect(() => {
@@ -127,6 +134,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
+  const retryAuth = useCallback(async () => {
+    setStatus('loading');
+    setAuthError(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    await resolveSession(session?.user || null);
+  }, [resolveSession]);
+
   const signOut = useCallback(async () => {
     fastCache.clearAll();
     await AuthService.signOut();
@@ -149,9 +163,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLead,
       isStudent,
       role,
+      authError,
       signInWithPassword,
       refreshProfile,
       signOut,
+      retryAuth,
     }),
     [
       status,
@@ -161,9 +177,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLead,
       isStudent,
       role,
+      authError,
       signInWithPassword,
       refreshProfile,
       signOut,
+      retryAuth,
     ]
   );
 

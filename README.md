@@ -62,8 +62,8 @@ cp .env.example .env
 ```
 Ensure your environment variables are configured:
 ```env
-VITE_SUPABASE_URL=https://cqpjehsbpjeqomwlshob.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_YLdlqjzPnNeJrUN4K6AvIw_b1nhe5MX
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_APP_URL=http://localhost:5173
 ```
 
@@ -120,8 +120,8 @@ The output directory `dist/` contains all optimized production bundles, `manifes
 
 4. **Add Environment Variables in Vercel**:
    In the Vercel dashboard project settings under **Environment Variables**, add:
-   - `VITE_SUPABASE_URL` = `https://cqpjehsbpjeqomwlshob.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY` = `sb_publishable_YLdlqjzPnNeJrUN4K6AvIw_b1nhe5MX`
+   - `VITE_SUPABASE_URL` = your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY` = your Supabase anonymous/public publishable key
 
 5. **Deploy**:
    - Click **Deploy**. Vercel will build the project and output a live HTTPS URL (e.g. `https://trackment-pwa.vercel.app`).
@@ -152,14 +152,11 @@ Once your production frontend is deployed (e.g. `https://trackment-pwa.vercel.ap
 
 ---
 
-## 🧪 Pre-Seeded Testing Accounts
+## 🧪 Testing Accounts & Academic Personas
 
-The database includes 50 pre-seeded mock accounts across all three personas.
+The system supports role-based authentication across three core academic personas:
 
-**Global Password for ALL Accounts:**
-```text
-123456
-```
+> **Security Note:** Default passwords must be configured securely in your local environment or Supabase Auth console. Never commit production passwords or shared credentials to version control. For development, set individual passwords per account via `/profile/password` or authenticate with your authorized institutional Google account (`@rvce.edu.in`).
 
 - **Faculty Mentors**:
   - `alan.turing@rvce.edu.in` (Prof. Alan Turing — CSE)

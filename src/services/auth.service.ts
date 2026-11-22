@@ -12,9 +12,8 @@ export class AuthService {
   static detectEmailRole(email?: string | null): 'STUDENT' | 'MENTOR' {
     if (!email) return 'STUDENT';
     const local = email.split('@')[0].toLowerCase();
-    // RVCE Student format has branch and graduation year (e.g. alex.cs22)
-    const hasBranchYearPattern = /\.[a-z]{2,4}\d{2}$/i.test(local);
-    return hasBranchYearPattern ? 'STUDENT' : 'MENTOR';
+    // QA-016 Fix: DB constraint enforce_profile_email_role specifies any digit in local part indicates a student
+    return /\d/.test(local) ? 'STUDENT' : 'MENTOR';
   }
 
   static async signInWithGoogle(): Promise<void> {
@@ -54,17 +53,39 @@ export class AuthService {
 
   static async signOut(): Promise<void> {
     fastCache.invalidate();
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.clear();
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('trackment_')) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (_) {}
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }
 
   static async loadProfile(userId: string): Promise<ProfileModel | null> {
     return fastCache.dedupe(`profile_${userId}`, async () => {
-      let { data } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      // QA-004 Fix: Distinguish network/500 errors from "no row" (PGRST116)
+      if (error) {
+        if (typeof window !== 'undefined') {
+          try {
+            const cached = localStorage.getItem(`trackment_offline_profile_${userId}`);
+            if (cached) return JSON.parse(cached);
+          } catch (_) {}
+        }
+        throw error;
+      }
 
       if (!data) {
         try {
@@ -75,6 +96,9 @@ export class AuthService {
               .select('*')
               .ilike('email', user.email.trim())
               .maybeSingle();
+            if (byEmail.error && byEmail.error.code !== 'PGRST116') {
+              throw byEmail.error;
+            }
             data = byEmail.data;
           }
         } catch (err) {
@@ -84,7 +108,7 @@ export class AuthService {
 
       if (!data) return null;
 
-      return {
+      const mapped: ProfileModel = {
         id: data.id,
         email: data.email || '',
         fullName: data.full_name || '',
@@ -100,7 +124,21 @@ export class AuthService {
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       };
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`trackment_offline_profile_${userId}`, JSON.stringify(mapped));
+        } catch (_) {}
+      }
+
+      return mapped;
     });
+  }
+
+  static async refreshProfile(userId: string): Promise<ProfileModel | null> {
+    // QA-011 Fix: Invalidate profile cache before refreshing profile
+    fastCache.invalidate(`profile_${userId}`);
+    return this.loadProfile(userId);
   }
 
   static async fetchProfile(userId: string): Promise<ProfileModel | null> {
@@ -135,62 +173,78 @@ export class AuthService {
     skills: string[];
     interests: string[];
   }): Promise<ProfileModel> {
-    try {
-      const { data: res, error } = await supabase.rpc('upsert_student_profile', {
-        p_full_name: data.fullName,
-        p_usn: data.usn.toUpperCase().trim(),
-        p_branch: data.branch,
-        p_section: data.section || null,
-        p_semester: data.semester || null,
-        p_skills: data.skills,
-        p_interests: data.interests,
-      });
-      if (error) throw error;
-      if (res) {
-        return {
-          id: res.id,
-          email: res.email || '',
-          fullName: res.full_name || data.fullName,
-          role: 'STUDENT',
-          usn: res.usn,
-          branch: res.branch,
-          section: res.section,
-          semester: res.semester,
-          skills: res.skills || [],
-          interests: res.interests || [],
-        };
-      }
-    } catch (e: any) {
-      console.warn('upsert_student_profile RPC fallback:', e);
-      if (e?.message?.toLowerCase().includes('usn') || e?.code === '23505') {
-        throw e;
-      }
+    const { data: res, error } = await supabase.rpc('upsert_student_profile', {
+      p_full_name: data.fullName,
+      p_usn: data.usn.toUpperCase().trim(),
+      p_branch: data.branch,
+      p_section: data.section || null,
+      p_semester: data.semester || null,
+      p_skills: data.skills,
+      p_interests: data.interests,
+    });
+
+    if (!error && res) {
+      return {
+        id: res.id,
+        email: res.email || '',
+        fullName: res.full_name || data.fullName,
+        role: 'STUDENT',
+        usn: res.usn,
+        branch: res.branch,
+        section: res.section,
+        semester: res.semester,
+        skills: res.skills || [],
+        interests: res.interests || [],
+      };
     }
 
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) throw new Error('Not authenticated');
+    // QA-014 Fix: If RPC failed due to validation or permission, throw error!
+    // Only attempt direct upsert fallback if the RPC function does not exist in DB.
+    if (
+      error &&
+      (error.code === 'PGRST202' ||
+        error.code === '42883' ||
+        error.message?.includes('function') ||
+        error.message?.includes('does not exist'))
+    ) {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error('Not authenticated');
 
-    const payload = {
-      id: user.id,
-      email: user.email!,
-      full_name: data.fullName,
-      role: 'STUDENT',
-      usn: data.usn.toUpperCase().trim(),
-      branch: data.branch,
-      section: data.section || null,
-      semester: data.semester || null,
-      skills: data.skills,
-      interests: data.interests,
-    };
+      const payload = {
+        id: user.id,
+        email: user.email!,
+        full_name: data.fullName,
+        role: 'STUDENT',
+        usn: data.usn.toUpperCase().trim(),
+        branch: data.branch,
+        section: data.section || null,
+        semester: data.semester || null,
+        skills: data.skills,
+        interests: data.interests,
+      };
 
-    const { data: inserted, error: insertErr } = await supabase
-      .from('profiles')
-      .upsert(payload)
-      .select()
-      .single();
+      const { data: inserted, error: insertErr } = await supabase
+        .from('profiles')
+        .upsert(payload)
+        .select()
+        .single();
 
-    if (insertErr) throw insertErr;
-    return inserted as unknown as ProfileModel;
+      if (insertErr) throw insertErr;
+      return {
+        id: inserted.id,
+        email: inserted.email || '',
+        fullName: inserted.full_name || data.fullName,
+        role: 'STUDENT',
+        usn: inserted.usn,
+        branch: inserted.branch,
+        section: inserted.section,
+        semester: inserted.semester,
+        skills: inserted.skills || [],
+        interests: inserted.interests || [],
+      };
+    }
+
+    throw error || new Error('Could not create student profile.');
   }
 
   static async createFacultyProfile(data: {
@@ -198,54 +252,67 @@ export class AuthService {
     department: string;
     facultyCode: string;
   }): Promise<ProfileModel> {
-    try {
-      const { data: res, error } = await supabase.rpc('upsert_faculty_profile', {
-        p_full_name: data.fullName,
-        p_department: data.department,
-        p_faculty_code: data.facultyCode.toUpperCase().trim(),
-      });
-      if (error) throw error;
-      if (res) {
-        return {
-          id: res.id,
-          email: res.email || '',
-          fullName: res.full_name || data.fullName,
-          role: 'MENTOR',
-          department: res.department,
-          facultyCode: res.faculty_code,
-          skills: [],
-          interests: [],
-        };
-      }
-    } catch (e: any) {
-      console.warn('upsert_faculty_profile RPC fallback:', e);
-      if (e?.message?.toLowerCase().includes('faculty') || e?.code === '23505') {
-        throw e;
-      }
+    const { data: res, error } = await supabase.rpc('upsert_faculty_profile', {
+      p_full_name: data.fullName,
+      p_department: data.department,
+      p_faculty_code: data.facultyCode.toUpperCase().trim(),
+    });
+
+    if (!error && res) {
+      return {
+        id: res.id,
+        email: res.email || '',
+        fullName: res.full_name || data.fullName,
+        role: 'MENTOR',
+        department: res.department,
+        facultyCode: res.faculty_code,
+        skills: [],
+        interests: [],
+      };
     }
 
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) throw new Error('Not authenticated');
+    // QA-014 Fix: Only fallback if RPC function does not exist
+    if (
+      error &&
+      (error.code === 'PGRST202' ||
+        error.code === '42883' ||
+        error.message?.includes('function') ||
+        error.message?.includes('does not exist'))
+    ) {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error('Not authenticated');
 
-    const payload = {
-      id: user.id,
-      email: user.email!,
-      full_name: data.fullName,
-      role: 'MENTOR',
-      department: data.department,
-      faculty_code: data.facultyCode.toUpperCase().trim(),
-      skills: [],
-      interests: [],
-    };
+      const payload = {
+        id: user.id,
+        email: user.email!,
+        full_name: data.fullName,
+        role: 'MENTOR',
+        department: data.department,
+        faculty_code: data.facultyCode.toUpperCase().trim(),
+        skills: [],
+        interests: [],
+      };
 
-    const { data: inserted, error: insertErr } = await supabase
-      .from('profiles')
-      .upsert(payload)
-      .select()
-      .single();
+      const { data: inserted, error: insertErr } = await supabase
+        .from('profiles')
+        .upsert(payload)
+        .select()
+        .single();
 
-    if (insertErr) throw insertErr;
-    return inserted as unknown as ProfileModel;
+      if (insertErr) throw insertErr;
+      return {
+        id: inserted.id,
+        email: inserted.email || '',
+        fullName: inserted.full_name || data.fullName,
+        role: 'MENTOR',
+        department: inserted.department,
+        facultyCode: inserted.faculty_code,
+        skills: [],
+        interests: [],
+      };
+    }
+
+    throw error || new Error('Could not create faculty profile.');
   }
 
   static async saveProfile(profile: Partial<ProfileModel> & { id: string }): Promise<ProfileModel> {
@@ -288,6 +355,8 @@ export class AuthService {
   static async deleteAccount(): Promise<void> {
     const { error } = await supabase.rpc('delete_user');
     if (error) throw error;
-    await this.signOut();
+    try {
+      await this.signOut();
+    } catch (_) {}
   }
 }

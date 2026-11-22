@@ -121,13 +121,35 @@ export class LargestRemainderAllocator {
   ];
 
   /**
-   * Resolves phase index (1, 2, or 3) from a phase name.
+   * Resolves phase index (1, 2, or 3) from a phase name using strict word-boundary matching.
    */
   static resolvePhaseNumber(phaseName: string): number {
-    const name = phaseName.toLowerCase();
-    if (name.includes('1') || name.includes('synopsis') || name.includes('arch')) return 1;
-    if (name.includes('2') || name.includes('milestone')) return 2;
-    if (name.includes('3') || name.includes('final') || name.includes('cie') || name.includes('defense')) return 3;
+    if (!phaseName || typeof phaseName !== 'string') return 1;
+    const name = phaseName.trim().toLowerCase();
+
+    // Specific phase checks with word boundaries - check Phase 3 first
+    if (/\b(?:phase\s*3|p3|final(?:\s*demo|\s*eval|\s*defense|\s*presentation)?|cie\s*3)\b/i.test(name)) {
+      return 3;
+    }
+    // Phase 2 check
+    if (/\b(?:phase\s*2|p2|milestone(?:\s*review)?|cie\s*2)\b/i.test(name)) {
+      return 2;
+    }
+    // Phase 1 check
+    if (/\b(?:phase\s*1|p1|synopsis|formulation|cie\s*1)\b/i.test(name)) {
+      return 1;
+    }
+
+    // Explicit phase pattern match
+    const phaseMatch = name.match(/\bphase\s*([123])\b/i);
+    if (phaseMatch) {
+      return parseInt(phaseMatch[1], 10);
+    }
+
+    if (/\b3\b/.test(name)) return 3;
+    if (/\b2\b/.test(name)) return 2;
+    if (/\b1\b/.test(name)) return 1;
+
     return 1;
   }
 
@@ -142,7 +164,8 @@ export class LargestRemainderAllocator {
    * Problem Definition (20) > Objectives (10) > Methodology (10)
    */
   static allocatePhase1(totalMarks: number): Record<string, number> {
-    const t = Math.max(0, Math.min(40, Math.round(totalMarks)));
+    const safeTotal = Number.isFinite(totalMarks) ? totalMarks : 0;
+    const t = Math.max(0, Math.min(40, Math.round(safeTotal)));
     if (t === 0) {
       return { problem_definition: 0, objectives: 0, methodology: 0 };
     }
@@ -167,7 +190,8 @@ export class LargestRemainderAllocator {
    * Project Execution (30) > Tools & Techniques (20) > Partial Results (10 [4+3+3])
    */
   static allocatePhase2(totalMarks: number): Record<string, number> {
-    const t = Math.max(0, Math.min(60, Math.round(totalMarks)));
+    const safeTotal = Number.isFinite(totalMarks) ? totalMarks : 0;
+    const t = Math.max(0, Math.min(60, Math.round(safeTotal)));
     if (t === 0) {
       return {
         project_execution: 0,
@@ -237,7 +261,8 @@ export class LargestRemainderAllocator {
    * Ceiling Guard: If total > 80, Core is capped at 80 and overflow (total - 80) is allocated to Notable Outcomes (max 20).
    */
   static allocatePhase3(totalMarks: number): Record<string, number> {
-    const t = Math.max(0, Math.min(100, Math.round(totalMarks)));
+    const safeTotal = Number.isFinite(totalMarks) ? totalMarks : 0;
+    const t = Math.max(0, Math.min(100, Math.round(safeTotal)));
     if (t === 0) {
       return {
         prototype_demo: 0,

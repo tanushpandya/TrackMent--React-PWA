@@ -18,19 +18,62 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 520,
 }) => {
+  const modalRef = React.useRef<HTMLDivElement>(null);
+  const previousActiveElement = React.useRef<HTMLElement | null>(null);
+
   useEffect(() => {
+    if (!isOpen) return;
+
+    previousActiveElement.current = document.activeElement as HTMLElement | null;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
       }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    const timer = setTimeout(() => {
+      if (modalRef.current) {
+        const focusable =
+          modalRef.current.querySelector<HTMLElement>('input, textarea, select, button:not([aria-label="Close dialog"])') ||
+          modalRef.current.querySelector<HTMLElement>('button');
+        if (focusable) focusable.focus();
+      }
+    }, 50);
+
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timer);
+      if (previousActiveElement.current && typeof previousActiveElement.current.focus === 'function') {
+        previousActiveElement.current.focus();
+      }
     };
   }, [isOpen, onClose]);
 
@@ -55,6 +98,7 @@ export const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

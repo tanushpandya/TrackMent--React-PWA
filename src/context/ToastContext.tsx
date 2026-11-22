@@ -28,6 +28,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast }}>
       {children}
       <div
+        role="region"
+        aria-label="Notifications"
+        aria-live="polite"
         style={{
           position: 'fixed',
           bottom: 24,
@@ -43,6 +46,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {toasts.map((toast) => (
           <div
             key={toast.id}
+            role={toast.type === 'error' ? 'alert' : 'status'}
+            aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
             style={{
               padding: '12px 20px',
               borderRadius: 14,

@@ -13,6 +13,8 @@ export interface ProfileModel {
   interests: string[];
   department?: string;
   facultyCode?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TeamReportModel {

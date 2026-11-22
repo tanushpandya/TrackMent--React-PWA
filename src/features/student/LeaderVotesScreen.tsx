@@ -200,17 +200,38 @@ export const LeaderVotesScreen: React.FC = () => {
                     </div>
 
                     {!isLeader && c.status === 'PENDING' && (
-                      <button
-                        onClick={() => {
-                          setActiveContrib(c);
-                          setVoteVerdict('CONFIRMED');
-                          setRejectionReason('');
-                        }}
-                        className="btn btn-primary btn-sm"
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                      >
-                        <Vote size={14} /> {myVote ? 'Change Vote' : 'Cast Vote ↗'}
-                      </button>
+                      myVote ? (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '6px 12px',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            background: myVote.verdict === 'CONFIRMED' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: myVote.verdict === 'CONFIRMED' ? '#16a34a' : '#dc2626',
+                            border: `1px solid ${myVote.verdict === 'CONFIRMED' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                          }}
+                        >
+                          <Vote size={13} />
+                          <span>Vote Recorded: {myVote.verdict}</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveContrib(c);
+                            setVoteVerdict('CONFIRMED');
+                            setRejectionReason('');
+                          }}
+                          className="btn btn-primary btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          <Vote size={14} /> Cast Vote ↗
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
