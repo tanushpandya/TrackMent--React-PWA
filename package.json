@@ -7,7 +7,9 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
+    "test:gantt": "node src/tests/gantt.qa.test.mjs",
     "test:perf": "node src/tests/perf.benchmark.mjs",
+    "test": "npm run test:gantt && npm run test:perf",
     "preview": "vite preview"
   },
   "dependencies": {
