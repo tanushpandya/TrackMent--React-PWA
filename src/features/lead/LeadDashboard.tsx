@@ -52,17 +52,19 @@ export const LeadDashboard: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const teamId = team?.id;
+
   const loadData = useCallback(async () => {
-    if (!team) return;
+    if (!teamId) return;
     try {
       setLoading(true);
       const [pending, meeting, feedback, requests, evals, vis] = await Promise.all([
-        ContributionService.fetchPendingForTeam(team.id),
-        AppointmentService.fetchUpcomingForTeam(team.id),
-        FeedbackService.fetchForTeam(team.id),
-        TeamService.fetchJoinRequests(team.id, true),
-        TeamService.fetchTeamEvaluations(team.id),
-        TeamService.fetchMarksVisibility(team.id),
+        ContributionService.fetchPendingForTeam(teamId),
+        AppointmentService.fetchUpcomingForTeam(teamId),
+        FeedbackService.fetchForTeam(teamId),
+        TeamService.fetchJoinRequests(teamId, true),
+        TeamService.fetchTeamEvaluations(teamId),
+        TeamService.fetchMarksVisibility(teamId),
       ]);
 
       const teammateIds = new Set<string>();
@@ -84,7 +86,7 @@ export const LeadDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [team]);
+  }, [teamId, team?.leaderId, members]);
 
   useEffect(() => {
     loadData();

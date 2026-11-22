@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -32,8 +32,14 @@ export const BrowseTeamsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedTheme, setSelectedTheme] = useState('All');
   const [sortBy, setSortBy] = useState<'recent' | 'name'>('recent');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Request to Join modal
   const [targetTeam, setTargetTeam] = useState<TeamModel | null>(null);
@@ -79,23 +85,32 @@ export const BrowseTeamsScreen: React.FC = () => {
     }
   };
 
-  const filteredTeams = teams.filter((t) => {
-    if (selectedTheme !== 'All' && !t.theme.toLowerCase().includes(selectedTheme.toLowerCase())) {
-      return false;
-    }
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      t.teamName.toLowerCase().includes(q) ||
-      t.projectTitle.toLowerCase().includes(q) ||
-      t.theme.toLowerCase().includes(q)
-    );
-  });
+  const requestedTeamIds = useMemo(
+    () => new Set(mySentRequests.map((r) => r.teamId)),
+    [mySentRequests]
+  );
 
-  const sortedTeams = [...filteredTeams].sort((a, b) => {
-    if (sortBy === 'name') return a.teamName.localeCompare(b.teamName);
-    return b.id - a.id;
-  });
+  const sortedTeams = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    const selTheme = selectedTheme.toLowerCase();
+
+    const filtered = teams.filter((t) => {
+      if (selectedTheme !== 'All' && !t.theme.toLowerCase().includes(selTheme)) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        t.teamName.toLowerCase().includes(q) ||
+        t.projectTitle.toLowerCase().includes(q) ||
+        t.theme.toLowerCase().includes(q)
+      );
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name') return a.teamName.localeCompare(b.teamName);
+      return b.id - a.id;
+    });
+  }, [teams, debouncedSearch, selectedTheme, sortBy]);
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 16px 40px' }}>
@@ -242,7 +257,7 @@ export const BrowseTeamsScreen: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {sortedTeams.map((team) => {
-            const hasRequested = mySentRequests.some((r) => r.teamId === team.id);
+            const hasRequested = requestedTeamIds.has(team.id);
 
             return (
               <AppCard key={team.id} style={{ padding: '20px' }}>

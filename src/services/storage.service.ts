@@ -1,4 +1,5 @@
 import { supabase, PROOFS_BUCKET, REPORTS_BUCKET, MAX_FILE_SIZE_BYTES, MAX_REPORT_FILE_SIZE_BYTES } from './supabase';
+import { fastCache } from '../utils/cache';
 import { ContributionFile } from '../types';
 
 export class StorageService {
@@ -147,14 +148,16 @@ export class StorageService {
   }
 
   static async getSignedUrl(storagePath: string, seconds = 3600): Promise<string> {
-    const { data, error } = await supabase.storage
-      .from(PROOFS_BUCKET)
-      .createSignedUrl(storagePath, seconds);
+    return fastCache.dedupeSignedUrl(`proof_${storagePath}`, async () => {
+      const { data, error } = await supabase.storage
+        .from(PROOFS_BUCKET)
+        .createSignedUrl(storagePath, seconds);
 
-    if (error || !data) {
-      throw error || new Error('Could not generate signed URL for document');
-    }
-    return data.signedUrl;
+      if (error || !data) {
+        throw error || new Error('Could not generate signed URL for document');
+      }
+      return data.signedUrl;
+    });
   }
 
   static async getProofSignedUrl(storagePath: string, seconds = 3600): Promise<string> {
@@ -162,14 +165,16 @@ export class StorageService {
   }
 
   static async getReportSignedUrl(storagePath: string, seconds = 3600): Promise<string> {
-    const { data, error } = await supabase.storage
-      .from(REPORTS_BUCKET)
-      .createSignedUrl(storagePath, seconds);
+    return fastCache.dedupeSignedUrl(`report_${storagePath}`, async () => {
+      const { data, error } = await supabase.storage
+        .from(REPORTS_BUCKET)
+        .createSignedUrl(storagePath, seconds);
 
-    if (error || !data) {
-      throw error || new Error('Could not generate signed URL for team report');
-    }
-    return data.signedUrl;
+      if (error || !data) {
+        throw error || new Error('Could not generate signed URL for team report');
+      }
+      return data.signedUrl;
+    });
   }
 
   static async removeProofs(paths: string[]): Promise<void> {

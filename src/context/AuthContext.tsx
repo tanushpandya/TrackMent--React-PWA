@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import { AuthService } from '../services/auth.service';
+import { fastCache } from '../utils/cache';
 import { ProfileModel, Role } from '../types';
 
 export type AuthStatus = 'loading' | 'newUser' | 'ready' | 'guest';
@@ -127,6 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const signOut = useCallback(async () => {
+    fastCache.clearAll();
     await AuthService.signOut();
     setUser(null);
     setProfile(null);
@@ -138,21 +140,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isLead = role === 'TEAM_LEAD';
   const isStudent = role === 'STUDENT';
 
+  const contextValue = useMemo<AuthContextType>(
+    () => ({
+      status,
+      user,
+      profile,
+      isMentor,
+      isLead,
+      isStudent,
+      role,
+      signInWithPassword,
+      refreshProfile,
+      signOut,
+    }),
+    [
+      status,
+      user,
+      profile,
+      isMentor,
+      isLead,
+      isStudent,
+      role,
+      signInWithPassword,
+      refreshProfile,
+      signOut,
+    ]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        status,
-        user,
-        profile,
-        isMentor,
-        isLead,
-        isStudent,
-        role,
-        signInWithPassword,
-        refreshProfile,
-        signOut,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -28,6 +28,25 @@ import { ContributionService } from '../../services/contribution.service';
 import { TeamService } from '../../services/team.service';
 import { AppCard } from '../../components/common/AppCard';
 
+// Reusable date formatter and bounded cache for O(1) date formatting
+const dateFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const dateCache = new Map<string, string>();
+
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  const cached = dateCache.get(iso);
+  if (cached) return cached;
+  try {
+    const formatted = dateFormatter.format(new Date(iso));
+    if (dateCache.size < 500) {
+      dateCache.set(iso, formatted);
+    }
+    return formatted;
+  } catch {
+    return iso;
+  }
+}
+
 interface Props {
   teams?: TeamModel[];
   selectedTeamId?: number;
@@ -97,7 +116,7 @@ export const MentorGanttChart: React.FC<Props> = ({
     };
   }, [activeTeamId, singleTeamContributions, singleTeamMembers]);
 
-  // Build canonical RVCE institutional milestones
+  // Build canonical RVCE institutional milestones using single-pass O(N) partitioning
   const milestones: MilestoneModel[] = useMemo(() => {
     if (!activeTeam) return [];
 
@@ -111,35 +130,36 @@ export const MentorGanttChart: React.FC<Props> = ({
 
     const now = new Date();
 
-    const p1Contribs = contributions.filter((c) => {
-      const lower = (c.title + ' ' + (c.description || '')).toLowerCase();
-      if (lower.includes('phase 1') || lower.includes('synopsis') || lower.includes('literature') || lower.includes('problem')) {
-        return true;
-      }
-      const cDate = c.createdAt ? new Date(c.createdAt) : new Date();
-      return cDate <= p1End;
-    });
+    const p1Contribs: ContributionModel[] = [];
+    const p2Contribs: ContributionModel[] = [];
+    const p3Contribs: ContributionModel[] = [];
 
-    const p2Contribs = contributions.filter((c) => {
+    // Single-pass O(N) categorization avoiding repeated array filtering and lowercasing
+    for (let i = 0; i < contributions.length; i++) {
+      const c = contributions[i];
       const lower = (c.title + ' ' + (c.description || '')).toLowerCase();
-      if (lower.includes('phase 2') || lower.includes('execution') || lower.includes('module') || lower.includes('partial')) {
-        return true;
-      }
-      const cDate = c.createdAt ? new Date(c.createdAt) : new Date();
-      return cDate > p1End && cDate <= p2End;
-    });
+      const isP1 = lower.includes('phase 1') || lower.includes('synopsis') || lower.includes('literature') || lower.includes('problem');
+      const isP2 = lower.includes('phase 2') || lower.includes('execution') || lower.includes('module') || lower.includes('partial');
+      const isP3 = lower.includes('phase 3') || lower.includes('prototype') || lower.includes('report') || lower.includes('final');
 
-    const p3Contribs = contributions.filter((c) => {
-      const lower = (c.title + ' ' + (c.description || '')).toLowerCase();
-      if (lower.includes('phase 3') || lower.includes('prototype') || lower.includes('report') || lower.includes('final')) {
-        return true;
+      const cDate = c.createdAt ? new Date(c.createdAt) : now;
+
+      if (isP1 || cDate <= p1End) {
+        p1Contribs.push(c);
+      } else if (isP2 || cDate <= p2End) {
+        p2Contribs.push(c);
+      } else if (isP3 || cDate > p2End) {
+        p3Contribs.push(c);
+      } else {
+        p2Contribs.push(c);
       }
-      const cDate = c.createdAt ? new Date(c.createdAt) : new Date();
-      return cDate > p2End;
-    });
+    }
 
     const getStatus = (start: Date, end: Date, contribs: ContributionModel[]): MilestoneModel['status'] => {
-      const confirmedCount = contribs.filter((c) => c.status === 'CONFIRMED').length;
+      let confirmedCount = 0;
+      for (let j = 0; j < contribs.length; j++) {
+        if (contribs[j].status === 'CONFIRMED') confirmedCount++;
+      }
       if (confirmedCount >= 2 && now > end) return 'COMPLETED';
       if (now > end && confirmedCount === 0) return 'OVERDUE';
       if (now >= start && now <= end) return 'IN_PROGRESS';
@@ -187,44 +207,68 @@ export const MentorGanttChart: React.FC<Props> = ({
   const calculatedProgress = useMemo(() => {
     let weightedScore = 0;
     milestones.forEach((m) => {
-      const confirmed = (m.contributions || []).filter((c) => c.status === 'CONFIRMED').length;
+      let confirmed = 0;
+      const list = m.contributions || [];
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].status === 'CONFIRMED') confirmed++;
+      }
       const milestoneCompletion = Math.min(1.0, confirmed / 2.0);
       weightedScore += m.weightPct * milestoneCompletion;
     });
     return Math.round(weightedScore);
   }, [milestones]);
 
+  // Optimized from O(M * N) nested scans to single-pass Map indexing O(N + M)
   const memberContributionStats = useMemo(() => {
-    const totalConfirmedAll = contributions.filter((c) => c.status === 'CONFIRMED').length;
+    let totalConfirmedAll = 0;
+    const statsByMemberKey = new Map<string, { total: number; confirmed: number; pending: number; rejected: number }>();
+
+    for (let i = 0; i < contributions.length; i++) {
+      const c = contributions[i];
+      const isConfirmed = c.status === 'CONFIRMED';
+      const isPending = c.status === 'PENDING';
+      const isRejected = c.status === 'REJECTED';
+
+      if (isConfirmed) totalConfirmedAll++;
+
+      const keys: string[] = [];
+      if (c.authorId) keys.push(c.authorId);
+      if (c.studentUsn) keys.push(c.studentUsn);
+      if (c.authorUsn && c.authorUsn !== c.studentUsn) keys.push(c.authorUsn);
+
+      for (let k = 0; k < keys.length; k++) {
+        const key = keys[k];
+        let record = statsByMemberKey.get(key);
+        if (!record) {
+          record = { total: 0, confirmed: 0, pending: 0, rejected: 0 };
+          statsByMemberKey.set(key, record);
+        }
+        record.total++;
+        if (isConfirmed) record.confirmed++;
+        if (isPending) record.pending++;
+        if (isRejected) record.rejected++;
+      }
+    }
 
     return teamMembers.map((member) => {
-      const memberContribs = contributions.filter(
-        (c) => c.authorId === member.id || c.studentUsn === member.usn || c.authorUsn === member.usn
-      );
-      const confirmed = memberContribs.filter((c) => c.status === 'CONFIRMED').length;
-      const pending = memberContribs.filter((c) => c.status === 'PENDING').length;
-      const rejected = memberContribs.filter((c) => c.status === 'REJECTED').length;
+      const stats =
+        statsByMemberKey.get(member.id) ||
+        (member.usn ? statsByMemberKey.get(member.usn) : undefined) ||
+        { total: 0, confirmed: 0, pending: 0, rejected: 0 };
 
-      const sharePct = totalConfirmedAll > 0 ? Math.round((confirmed / totalConfirmedAll) * 100) : 0;
+      const sharePct = totalConfirmedAll > 0 ? Math.round((stats.confirmed / totalConfirmedAll) * 100) : 0;
 
       return {
         member,
-        total: memberContribs.length,
-        confirmed,
-        pending,
-        rejected,
+        total: stats.total,
+        confirmed: stats.confirmed,
+        pending: stats.pending,
+        rejected: stats.rejected,
         sharePct,
       };
     });
   }, [teamMembers, contributions]);
 
-  const formatDate = (iso: string) => {
-    try {
-      return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch {
-      return iso;
-    }
-  };
 
   const renderStatusBadge = (status: MilestoneModel['status']) => {
     switch (status) {

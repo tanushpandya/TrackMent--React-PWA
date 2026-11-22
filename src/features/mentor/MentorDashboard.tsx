@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -49,8 +49,15 @@ export const MentorDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'recent'>('name');
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'gantt'>('cards');
+
+  // Debounce search query to eliminate unnecessary re-filtering on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Marks visibility
   const [isMarksVisible, setIsMarksVisible] = useState(false);
@@ -162,22 +169,25 @@ export const MentorDashboard: React.FC = () => {
     }
   };
 
-  // Filter & sort teams
-  const filteredTeams = teams.filter((t) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      t.teamName.toLowerCase().includes(q) ||
-      t.teamCode.toLowerCase().includes(q) ||
-      t.projectTitle.toLowerCase().includes(q)
-    );
-  });
+  // Memoized filter & sort teams
+  const sortedTeams = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    const filtered = !q
+      ? teams
+      : teams.filter((t) => {
+          return (
+            (t.teamName && t.teamName.toLowerCase().includes(q)) ||
+            (t.teamCode && t.teamCode.toLowerCase().includes(q)) ||
+            (t.projectTitle && t.projectTitle.toLowerCase().includes(q))
+          );
+        });
 
-  const sortedTeams = [...filteredTeams].sort((a, b) => {
-    if (sortBy === 'name') return a.teamName.localeCompare(b.teamName);
-    if (sortBy === 'progress') return (b.currentProgressPct || 0) - (a.currentProgressPct || 0);
-    return b.id - a.id;
-  });
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name') return a.teamName.localeCompare(b.teamName);
+      if (sortBy === 'progress') return (b.currentProgressPct || 0) - (a.currentProgressPct || 0);
+      return b.id - a.id;
+    });
+  }, [teams, debouncedSearch, sortBy]);
 
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 8px' }}>
@@ -618,7 +628,7 @@ export const MentorDashboard: React.FC = () => {
             marginBottom: '40px',
           }}
         >
-          {sortedTeams.map((team) => (
+          {sortedTeams.map((team: TeamModel) => (
             <AppCard key={team.id} style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
               {/* Header: Name + Code Badge */}
               <div
