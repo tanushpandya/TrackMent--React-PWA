@@ -44,7 +44,7 @@ export class FeedbackService {
     mentorId: string;
     contributionId: number;
   }): Promise<boolean> {
-    const { data: existing } = await supabase
+    const { data: existing, error: findErr } = await supabase
       .from('feedback')
       .select('id')
       .eq('contribution_id', params.contributionId)
@@ -52,17 +52,23 @@ export class FeedbackService {
       .eq('feedback_type', 'THUMBS_UP')
       .maybeSingle();
 
+    if (findErr) throw findErr;
+
     if (existing) {
-      await supabase.from('feedback').delete().eq('id', existing.id);
+      const { error: delErr } = await supabase.from('feedback').delete().eq('id', existing.id);
+      if (delErr) throw delErr;
+      fastCache.invalidate(`feedback_${params.teamId}`);
       return false; // un-liked
     } else {
-      await supabase.from('feedback').insert({
+      const { error: insErr } = await supabase.from('feedback').insert({
         team_id: params.teamId,
         mentor_id: params.mentorId,
         contribution_id: params.contributionId,
         feedback_type: 'THUMBS_UP',
         content: 'Acknowledged contribution deliverable 👍',
       });
+      if (insErr) throw insErr;
+      fastCache.invalidate(`feedback_${params.teamId}`);
       return true; // liked
     }
   }
@@ -125,19 +131,21 @@ export class FeedbackService {
     const categoryTag = params.category ? `[${params.category.toUpperCase()}] ` : '';
     const formattedContent = `📢 ${categoryTag}${params.subject.trim()}\n\n${params.message.trim()}`;
 
+    // QA-003 Fix: Use 'COMMENT' to satisfy SQL check constraint IN ('COMMENT', 'THUMBS_UP', 'MEET_ME')
     const rows = params.teamIds.map((teamId) => ({
       team_id: teamId,
       mentor_id: params.mentorId,
-      feedback_type: 'GENERAL',
+      feedback_type: 'COMMENT' as FeedbackType,
       content: formattedContent,
     }));
 
-    const { error } = await supabase.from('feedback').insert(rows);
-    if (error) {
-      console.warn('Could not insert broadcast feedback rows:', error);
-    } else {
-      fastCache.invalidate('feedback_');
-    }
+    const { data: inserted, error } = await supabase
+      .from('feedback')
+      .insert(rows)
+      .select('id');
+
+    if (error) throw error;
+    fastCache.invalidate('feedback_');
 
     try {
       await supabase.functions.invoke('send-team-notification', {
@@ -149,7 +157,7 @@ export class FeedbackService {
       });
     } catch (_) {}
 
-    return params.teamIds.length;
+    return inserted?.length || rows.length;
   }
 
   private static mapFeedback(raw: any): FeedbackModel {

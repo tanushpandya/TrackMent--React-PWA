@@ -96,6 +96,18 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
     setUploadProgress(10);
     setErrorMsg(null);
 
+    // If user typed a link into the input box but forgot to click "+ Add", include it
+    let finalLinks = [...links];
+    const pendingLink = linkInput.trim();
+    if (pendingLink) {
+      try {
+        const parsed = new URL(pendingLink);
+        if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && !finalLinks.includes(pendingLink)) {
+          finalLinks.push(pendingLink);
+        }
+      } catch (_) {}
+    }
+
     let createdContribId: number | null = null;
     const uploadedPaths: string[] = [];
 
@@ -106,7 +118,7 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
         authorId: user.id,
         title: title.trim(),
         description: description.trim(),
-        links,
+        links: finalLinks,
       });
       createdContribId = contrib.id;
       setUploadProgress(30);
@@ -133,6 +145,7 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
       setTitle('');
       setDescription('');
       setLinks([]);
+      setLinkInput('');
       setFiles([]);
     } catch (err: any) {
       console.error('[SubmitContribution] Upload failed, executing atomic rollback:', err);
@@ -164,6 +177,8 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
     >
       {errorMsg && (
         <div
+          role="alert"
+          aria-live="assertive"
           style={{
             padding: '10px 14px',
             borderRadius: 12,
@@ -187,6 +202,7 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
             id="contrib-title"
             type="text"
             required
+            maxLength={150}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="form-input"

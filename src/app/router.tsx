@@ -164,25 +164,31 @@ export const router = createBrowserRouter([
   {
     path: '/profile/student',
     element: (
-      <Suspense fallback={<RouteLoadingSpinner />}>
-        <StudentProfileScreen />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <StudentProfileScreen />
+        </Suspense>
+      </ProtectedRoute>
     ),
   },
   {
     path: '/profile/faculty',
     element: (
-      <Suspense fallback={<RouteLoadingSpinner />}>
-        <FacultyProfileScreen />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <FacultyProfileScreen />
+        </Suspense>
+      </ProtectedRoute>
     ),
   },
   {
     path: '/profile/password',
     element: (
-      <Suspense fallback={<RouteLoadingSpinner />}>
-        <SetPasswordScreen />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <SetPasswordScreen />
+        </Suspense>
+      </ProtectedRoute>
     ),
   },
   {

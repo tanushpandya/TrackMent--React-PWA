@@ -33,35 +33,24 @@ export class LedgerService {
     } catch (_) {}
 
     return (rows || []).map((r: any) => {
-      const existingRecords: Record<string, AttendanceRecord> = {};
-      for (const a of r.meeting_attendance || []) {
-        const p = a.profiles || {};
-        const studentId = (a.student_id || '').toString();
-        if (studentId) {
-          existingRecords[studentId] = {
-            studentId,
-            studentName: p.full_name || 'Unknown',
-            usn: p.usn || '',
-            isPresent: a.is_present ?? true,
-          };
-        }
-      }
+      const attendanceList: AttendanceRecord[] = [];
+      const seenStudents = new Set<string>();
 
-      const mergedAttendance: AttendanceRecord[] = [];
-      for (const cm of currentMembers) {
-        if (existingRecords[cm.id]) {
-          mergedAttendance.push(existingRecords[cm.id]);
-          delete existingRecords[cm.id];
-        } else {
-          mergedAttendance.push({
-            studentId: cm.id,
-            studentName: cm.name,
-            usn: cm.usn,
-            isPresent: true,
-          });
-        }
+      for (const a of r.meeting_attendance || []) {
+        const studentId = (a.student_id || '').toString();
+        if (!studentId || seenStudents.has(studentId)) continue;
+        seenStudents.add(studentId);
+
+        const p = a.profiles || {};
+        const memberInfo = currentMembers.find((m) => m.id === studentId);
+
+        attendanceList.push({
+          studentId,
+          studentName: p.full_name?.trim() || memberInfo?.name || 'Student',
+          usn: p.usn?.trim() || memberInfo?.usn || '',
+          isPresent: a.is_present === true,
+        });
       }
-      mergedAttendance.push(...Object.values(existingRecords));
 
       return {
         id: r.id.toString(),
@@ -69,7 +58,7 @@ export class LedgerService {
         meetingNumber: Number(r.meeting_number),
         meetingDate: r.meeting_date,
         summaryNotes: r.summary_notes || '',
-        attendance: mergedAttendance,
+        attendance: attendanceList,
       };
     });
   }

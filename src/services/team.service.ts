@@ -18,7 +18,7 @@ import {
 export class TeamService {
   static async fetchMyTeam(userId: string): Promise<TeamModel | null> {
     return fastCache.dedupe(`my_team_${userId}`, async () => {
-      // Parallelize checking team_members and teams.leader_id to cut waterfall latency in half
+      // Parallelize checking team_members and teams.leader_id
       const [memberRes, leadRes] = await Promise.all([
         supabase
           .from('team_members')
@@ -32,16 +32,28 @@ export class TeamService {
           .maybeSingle(),
       ]);
 
+      // If backend network error or 500 occurred, check offline cache or throw
+      if (memberRes.error || leadRes.error) {
+        const error = memberRes.error || leadRes.error;
+        try {
+          const cached = sessionStorage.getItem(`trackment_cached_team_${userId}`);
+          if (cached) return JSON.parse(cached);
+        } catch (_) {}
+        throw error;
+      }
+
       if (leadRes.data) {
         return this.mapTeam(leadRes.data);
       }
 
       if (memberRes.data?.team_id) {
-        const { data: teamData } = await supabase
+        const { data: teamData, error: teamErr } = await supabase
           .from('teams')
           .select('*')
           .eq('id', memberRes.data.team_id)
           .maybeSingle();
+
+        if (teamErr) throw teamErr;
         if (teamData) return this.mapTeam(teamData);
       }
 
@@ -247,33 +259,47 @@ export class TeamService {
     fastCache.invalidate(`team_${data.teamId}`);
     fastCache.invalidate('my_team_');
     fastCache.invalidate('team_directory');
-    try {
-      await supabase.rpc('update_team_project_info', {
-        p_team_id: data.teamId,
-        p_project_title: data.projectTitle,
-        p_project_gist: data.projectGist,
-        p_theme: data.theme,
-        p_branch: data.branch,
-        p_abstract: data.abstractText || null,
-        p_objectives: data.objectives || null,
-      });
+
+    const { error: rpcError } = await supabase.rpc('update_team_project_info', {
+      p_team_id: data.teamId,
+      p_project_title: data.projectTitle,
+      p_project_gist: data.projectGist,
+      p_theme: data.theme,
+      p_branch: data.branch,
+      p_abstract: data.abstractText || null,
+      p_objectives: data.objectives || null,
+    });
+
+    if (!rpcError) return;
+
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const { data: updatedRows, error: updateErr } = await supabase
+        .from('teams')
+        .update({
+          project_title: data.projectTitle,
+          project_gist: data.projectGist,
+          theme: data.theme,
+          branch: data.branch,
+          abstract: data.abstractText || null,
+          objectives: data.objectives || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', data.teamId)
+        .select('id');
+
+      if (updateErr) throw updateErr;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Project info update failed: team not found or permission denied.');
+      }
       return;
-    } catch (_) {}
+    }
 
-    const { error } = await supabase
-      .from('teams')
-      .update({
-        project_title: data.projectTitle,
-        project_gist: data.projectGist,
-        theme: data.theme,
-        branch: data.branch,
-        abstract: data.abstractText || null,
-        objectives: data.objectives || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', data.teamId);
-
-    if (error) throw error;
+    throw rpcError;
   }
 
   static async updateProgress(data: {
@@ -281,24 +307,48 @@ export class TeamService {
     progressPct: number;
     milestoneNote: string;
   }): Promise<void> {
-    const { error } = await supabase.rpc('update_team_progress', {
+    fastCache.invalidate(`team_${data.teamId}`);
+    fastCache.invalidate('my_team_');
+
+    const { error: rpcError } = await supabase.rpc('update_team_progress', {
       p_team_id: data.teamId,
       p_progress_pct: data.progressPct,
       p_milestone_note: data.milestoneNote,
     });
-    if (error) {
-      // Fallback: direct table updates
-      await supabase.from('teams').update({ current_progress_pct: data.progressPct }).eq('id', data.teamId);
+
+    if (!rpcError) return;
+
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const { data: updated, error: updateErr } = await supabase
+        .from('teams')
+        .update({ current_progress_pct: data.progressPct, updated_at: new Date().toISOString() })
+        .eq('id', data.teamId)
+        .select('id');
+
+      if (updateErr) throw updateErr;
+      if (!updated || updated.length === 0) {
+        throw new Error('Failed to update progress: team not found or unauthorized.');
+      }
+
       const user = (await supabase.auth.getUser()).data.user;
       if (user) {
-        await supabase.from('progress_history').insert({
+        const { error: histErr } = await supabase.from('progress_history').insert({
           team_id: data.teamId,
           updated_by: user.id,
           progress_pct: data.progressPct,
           milestone_note: data.milestoneNote,
         });
+        if (histErr) throw histErr;
       }
+      return;
     }
+
+    throw rpcError;
   }
 
   static async fetchProgressHistory(teamId: number): Promise<ProgressHistoryEntry[]> {
@@ -319,6 +369,10 @@ export class TeamService {
   }
 
   static async leaveTeam(): Promise<number> {
+    fastCache.invalidate('my_team_');
+    fastCache.invalidate('roster_');
+    fastCache.invalidate('team_');
+
     const { data: res, error } = await supabase.rpc('leave_team');
     if (error) throw error;
 
@@ -337,18 +391,44 @@ export class TeamService {
   }
 
   static async removeTeamMember(teamId: number, memberId: string): Promise<void> {
-    try {
-      const { data: res } = await supabase.rpc('remove_team_member', {
-        p_team_id: teamId,
-        p_member_id: memberId,
-      });
-      if (res && res.storage_paths) {
-        await supabase.storage.from(PROOFS_BUCKET).remove(res.storage_paths);
+    fastCache.invalidate(`roster_${teamId}`);
+    fastCache.invalidate(`team_${teamId}`);
+    fastCache.invalidate(`my_team_${memberId}`);
+
+    const { data: res, error: rpcError } = await supabase.rpc('remove_team_member', {
+      p_team_id: teamId,
+      p_member_id: memberId,
+    });
+
+    if (!rpcError) {
+      if (res && res.storage_paths && Array.isArray(res.storage_paths) && res.storage_paths.length > 0) {
+        await supabase.storage.from(PROOFS_BUCKET).remove(res.storage_paths).catch(() => {});
       }
       return;
-    } catch (_) {}
+    }
 
-    await supabase.from('team_members').delete().eq('team_id', teamId).eq('user_id', memberId);
+    // QA-002: If RPC does not exist, run direct delete with row check
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const { data: deleted, error: deleteErr } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', teamId)
+        .eq('user_id', memberId)
+        .select('id');
+
+      if (deleteErr) throw deleteErr;
+      if (!deleted || deleted.length === 0) {
+        throw new Error('Member could not be removed: member not found or permission denied.');
+      }
+      return;
+    }
+
+    throw rpcError;
   }
 
   static async fetchDepartures(teamId: number): Promise<TeamDeparture[]> {
@@ -375,47 +455,85 @@ export class TeamService {
     mentorId: string;
     teamCode?: string;
   }): Promise<TeamModel | null> {
-    try {
-      const { data: res } = await supabase.rpc('claim_team_by_id', {
-        p_team_id: params.teamId,
-      });
-      if (res) return await this.fetchTeamById(params.teamId);
-    } catch (_) {}
+    fastCache.invalidate('my_teams_mentor_');
+    fastCache.invalidate(`team_${params.teamId}`);
 
-    if (params.teamCode) {
-      try {
-        const { data: res } = await supabase.rpc('claim_team_by_code', {
-          p_code: params.teamCode.trim().toUpperCase(),
-        });
-        if (res) {
-          const claimedId = typeof res === 'number' ? res : parseInt(res, 10);
-          return await this.fetchTeamById(claimedId);
-        }
-      } catch (_) {}
+    // Try claim by ID RPC
+    const { data: res, error: idErr } = await supabase.rpc('claim_team_by_id', {
+      p_team_id: params.teamId,
+    });
+
+    if (!idErr && res) {
+      return await this.fetchTeamById(params.teamId);
+    }
+    // QA-014: If business rule failed (mentor capacity, already claimed), throw error
+    if (
+      idErr &&
+      !idErr.message?.includes('does not exist') &&
+      idErr.code !== 'PGRST202' &&
+      idErr.code !== '42883'
+    ) {
+      throw idErr;
     }
 
-    const { data: updated } = await supabase
+    // Try claim by Code RPC if code provided
+    if (params.teamCode) {
+      const { data: codeRes, error: codeErr } = await supabase.rpc('claim_team_by_code', {
+        p_code: params.teamCode.trim().toUpperCase(),
+      });
+      if (!codeErr && codeRes) {
+        const claimedId = typeof codeRes === 'number' ? codeRes : parseInt(codeRes, 10);
+        return await this.fetchTeamById(claimedId);
+      }
+      if (
+        codeErr &&
+        !codeErr.message?.includes('does not exist') &&
+        codeErr.code !== 'PGRST202' &&
+        codeErr.code !== '42883'
+      ) {
+        throw codeErr;
+      }
+    }
+
+    // If RPCs were missing, try safe update that verifies mentor_id is null
+    const { data: updated, error: updateErr } = await supabase
       .from('teams')
       .update({ mentor_id: params.mentorId, updated_at: new Date().toISOString() })
       .eq('id', params.teamId)
-      .filter('mentor_id', 'is', null)
+      .is('mentor_id', null)
       .select()
       .maybeSingle();
 
+    if (updateErr) throw updateErr;
     return updated ? this.mapTeam(updated) : null;
   }
 
   static async abandonTeam(teamId: number): Promise<void> {
-    try {
-      await supabase.rpc('abandon_team', { p_team_id: teamId });
-      return;
-    } catch (_) {}
+    fastCache.invalidate('my_teams_mentor_');
+    fastCache.invalidate(`team_${teamId}`);
 
-    const { error } = await supabase
-      .from('teams')
-      .update({ mentor_id: null, updated_at: new Date().toISOString() })
-      .eq('id', teamId);
-    if (error) throw error;
+    const { error: rpcError } = await supabase.rpc('abandon_team', { p_team_id: teamId });
+    if (!rpcError) return;
+
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const { data: updated, error } = await supabase
+        .from('teams')
+        .update({ mentor_id: null, updated_at: new Date().toISOString() })
+        .eq('id', teamId)
+        .select('id');
+      if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error('Could not release team: team not found or permission denied.');
+      }
+      return;
+    }
+
+    throw rpcError;
   }
 
   static async searchAvailableStudents(query = '', branch = ''): Promise<ProfileModel[]> {
@@ -705,22 +823,34 @@ export class TeamService {
   }
 
   static async sendMentorRequest(teamId: number, mentorId: string, message = ''): Promise<void> {
-    try {
-      await supabase.rpc('send_mentor_request', {
-        p_team_id: teamId,
-        p_mentor_id: mentorId,
-        p_message: message || null,
-      });
-      return;
-    } catch (_) {}
+    fastCache.invalidate(`mentor_requests_${teamId}`);
+    fastCache.invalidate(`incoming_mentor_requests_${mentorId}`);
 
-    const { error } = await supabase.from('mentor_requests').insert({
-      team_id: teamId,
-      mentor_id: mentorId,
-      message: message.trim() || null,
-      status: 'PENDING',
+    const { error: rpcError } = await supabase.rpc('send_mentor_request', {
+      p_team_id: teamId,
+      p_mentor_id: mentorId,
+      p_message: message || null,
     });
-    if (error) throw error;
+
+    if (!rpcError) return;
+
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const { error } = await supabase.from('mentor_requests').insert({
+        team_id: teamId,
+        mentor_id: mentorId,
+        message: message.trim() || null,
+        status: 'PENDING',
+      });
+      if (error) throw error;
+      return;
+    }
+
+    throw rpcError;
   }
 
   static async fetchTeamSentMentorRequests(teamId: number): Promise<MentorRequestModel[]> {
@@ -761,22 +891,40 @@ export class TeamService {
   }
 
   static async respondToMentorRequest(requestId: number, accept: boolean): Promise<void> {
-    try {
-      await supabase.rpc('respond_to_mentor_request', {
-        p_request_id: requestId,
-        p_verdict: accept ? 'ACCEPTED' : 'REJECTED',
-      });
-      return;
-    } catch (_) {}
+    fastCache.invalidate('mentor_requests_');
+    fastCache.invalidate('incoming_mentor_requests_');
+    fastCache.invalidate('my_teams_mentor_');
 
-    const { error } = await supabase
-      .from('mentor_requests')
-      .update({
-        status: accept ? 'ACCEPTED' : 'REJECTED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', requestId);
-    if (error) throw error;
+    const { error: rpcError } = await supabase.rpc('respond_to_mentor_request', {
+      p_request_id: requestId,
+      p_verdict: accept ? 'ACCEPTED' : 'REJECTED',
+    });
+
+    if (!rpcError) return;
+
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const { data: updated, error } = await supabase
+        .from('mentor_requests')
+        .update({
+          status: accept ? 'ACCEPTED' : 'REJECTED',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', requestId)
+        .select('id');
+
+      if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error('Mentor request not found or already processed.');
+      }
+      return;
+    }
+
+    throw rpcError;
   }
 
   static async cancelMentorRequest(teamId: number, mentorId: string): Promise<void> {
@@ -907,69 +1055,88 @@ export class TeamService {
   }): Promise<void> {
     fastCache.invalidate(`evaluations_${data.teamId}`);
     const defaultMax = data.phaseName.includes('Phase 1') ? 40 : data.phaseName.includes('Phase 2') ? 60 : data.phaseName.includes('Phase 3') ? 100 : 50;
-    try {
-      await supabase.rpc('record_team_evaluation', {
-        p_team_id: data.teamId,
-        p_phase_name: data.phaseName,
-        p_total_marks: data.totalMarks,
-        p_max_marks: data.maxMarks || defaultMax,
-        p_member_marks: data.memberMarks,
-        p_remarks: data.remarks || null,
-        p_rubric_scores: data.rubricScores || {},
-      });
-      return;
-    } catch (_) {}
 
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) throw new Error('Not authenticated');
-
-    const { error } = await supabase.from('team_evaluations').insert({
-      team_id: data.teamId,
-      evaluator_id: user.id,
-      phase_name: data.phaseName,
-      total_marks: data.totalMarks,
-      max_marks: data.maxMarks || defaultMax,
-      member_marks: data.memberMarks,
-      remarks: data.remarks || null,
-      rubric_scores: data.rubricScores || {},
+    const { error: rpcError } = await supabase.rpc('record_team_evaluation', {
+      p_team_id: data.teamId,
+      p_phase_name: data.phaseName,
+      p_total_marks: data.totalMarks,
+      p_max_marks: data.maxMarks || defaultMax,
+      p_member_marks: data.memberMarks,
+      p_remarks: data.remarks || null,
+      p_rubric_scores: data.rubricScores || {},
     });
-    if (error) throw error;
+
+    if (!rpcError) return;
+
+    if (
+      rpcError.code === 'PGRST202' ||
+      rpcError.code === '42883' ||
+      rpcError.message?.includes('function') ||
+      rpcError.message?.includes('does not exist')
+    ) {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase.from('team_evaluations').insert({
+        team_id: data.teamId,
+        evaluator_id: user.id,
+        phase_name: data.phaseName,
+        total_marks: data.totalMarks,
+        max_marks: data.maxMarks || defaultMax,
+        member_marks: data.memberMarks,
+        remarks: data.remarks || null,
+        rubric_scores: data.rubricScores || {},
+      });
+      if (error) throw error;
+      return;
+    }
+
+    throw rpcError;
   }
 
   static async setMarksVisibility(teamId: number, isVisible: boolean): Promise<void> {
     fastCache.invalidate(`evaluations_${teamId}`);
-    fastCache.set(`marks_vis_${teamId}`, isVisible, 25000);
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error('Not signed in');
 
-    try {
-      const { data: existing } = await supabase
-        .from('team_evaluations')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('phase_name', '__MARKS_VISIBILITY__')
-        .maybeSingle();
+    const { data: existing, error: findErr } = await supabase
+      .from('team_evaluations')
+      .select('id')
+      .eq('team_id', teamId)
+      .eq('phase_name', '__MARKS_VISIBILITY__')
+      .maybeSingle();
 
-      if (existing) {
-        await supabase
-          .from('team_evaluations')
-          .update({
-            total_marks: isVisible ? 1.0 : 0.0,
-            remarks: isVisible ? 'VISIBLE' : 'HIDDEN',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', (existing as any).id);
-      } else {
-        await supabase.from('team_evaluations').insert({
-          team_id: teamId,
-          evaluator_id: user.id,
-          phase_name: '__MARKS_VISIBILITY__',
+    if (findErr) throw findErr;
+
+    if (existing) {
+      const { data: updated, error: updateErr } = await supabase
+        .from('team_evaluations')
+        .update({
           total_marks: isVisible ? 1.0 : 0.0,
-          max_marks: 1.0,
           remarks: isVisible ? 'VISIBLE' : 'HIDDEN',
-        });
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', (existing as any).id)
+        .select('id');
+
+      if (updateErr) throw updateErr;
+      if (!updated || updated.length === 0) {
+        throw new Error('Failed to update marks visibility flag.');
       }
-    } catch (_) {}
+    } else {
+      const { error: insertErr } = await supabase.from('team_evaluations').insert({
+        team_id: teamId,
+        evaluator_id: user.id,
+        phase_name: '__MARKS_VISIBILITY__',
+        total_marks: isVisible ? 1.0 : 0.0,
+        max_marks: 1.0,
+        remarks: isVisible ? 'VISIBLE' : 'HIDDEN',
+      });
+      if (insertErr) throw insertErr;
+    }
+
+    // QA-001 & QA-015 Fix: Only update cache AFTER database write succeeds
+    fastCache.set(`marks_vis_${teamId}`, isVisible, 25000);
   }
 
   static async setMarksVisibilityForTeams(teamIds: number[], isVisible: boolean): Promise<void> {
@@ -984,21 +1151,22 @@ export class TeamService {
 
     return fastCache.dedupe(`marks_vis_${teamId}`, async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('team_evaluations')
           .select('total_marks, remarks')
           .eq('team_id', teamId)
           .eq('phase_name', '__MARKS_VISIBILITY__')
           .maybeSingle();
 
-        // If mentor explicitly marked evaluations as hidden
-        if (data && ((data as any).total_marks === 0.0 || (data as any).remarks === 'HIDDEN')) {
+        if (error || !data) {
+          // QA-015 Fix: Default to HIDDEN (false) when flag row is absent or on read errors
           return false;
         }
-        // If mentor explicitly made visible or default when evaluations exist
-        return true;
+
+        // Only return true if explicitly marked VISIBLE
+        return Boolean((data as any).total_marks === 1.0 || (data as any).remarks === 'VISIBLE');
       } catch (_) {
-        return true;
+        return false;
       }
     }, 20000);
   }
@@ -1013,17 +1181,24 @@ export class TeamService {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error('Not authenticated');
 
-    StorageService.validateReportFile(file);
+    // QA-007 Fix: Validate report file format and size in the service
+    const validation = StorageService.validateReportFile(file);
+    if (!validation.isValid) {
+      throw new Error(validation.errorMessage || 'Invalid report file format or size.');
+    }
+
     if (!description.trim()) {
       throw new Error('Please enter a descriptive note for the report.');
     }
 
     // 1. Fetch current reports to detect replacement
-    const { data: teamRow } = await supabase
+    const { data: teamRow, error: fetchErr } = await supabase
       .from('teams')
       .select('reports')
       .eq('id', teamId)
       .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
 
     const currentReports: TeamReportModel[] = Array.isArray(teamRow?.reports)
       ? teamRow.reports.map((r: any) => ({
@@ -1037,17 +1212,9 @@ export class TeamService {
         }))
       : [];
 
-    // 2. Remove existing binary if replacing
     const oldReport = currentReports.find((r) => r.slot === slot);
-    if (oldReport && oldReport.storagePath) {
-      try {
-        await supabase.storage.from(REPORTS_BUCKET).remove([oldReport.storagePath]);
-      } catch (e) {
-        console.warn('[TeamService] Warning: Could not purge replaced report binary:', e);
-      }
-    }
 
-    // 3. Upload new binary
+    // QA-006 Fix: Upload new binary FIRST before deleting old file or updating DB
     const safeFileName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
     const storagePath = `reports/team_${teamId}/${slot}_${Date.now()}_${safeFileName}`;
 
@@ -1077,13 +1244,31 @@ export class TeamService {
         p_team_id: teamId,
         p_reports: updatedReports,
       });
-      if (rpcErr) throw rpcErr;
-    } catch (_) {
-      const { error: updateErr } = await supabase
-        .from('teams')
-        .update({ reports: updatedReports, updated_at: new Date().toISOString() })
-        .eq('id', teamId);
-      if (updateErr) throw updateErr;
+
+      if (rpcErr) {
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from('teams')
+          .update({ reports: updatedReports, updated_at: new Date().toISOString() })
+          .eq('id', teamId)
+          .select('id');
+        if (updateErr) throw updateErr;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error('Failed to update team reports record.');
+        }
+      }
+    } catch (dbErr) {
+      // Rollback: delete newly uploaded file to avoid orphaned storage if DB update failed
+      await supabase.storage.from(REPORTS_BUCKET).remove([storagePath]).catch(() => {});
+      throw dbErr;
+    }
+
+    // QA-006 Fix: Only purge old binary AFTER database update is safely confirmed
+    if (oldReport && oldReport.storagePath && oldReport.storagePath !== storagePath) {
+      try {
+        await supabase.storage.from(REPORTS_BUCKET).remove([oldReport.storagePath]);
+      } catch (e) {
+        console.warn('[TeamService] Warning: Could not purge replaced report binary:', e);
+      }
     }
 
     fastCache.invalidate(`team_${teamId}`);
@@ -1095,11 +1280,13 @@ export class TeamService {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error('Not authenticated');
 
-    const { data: teamRow } = await supabase
+    const { data: teamRow, error: fetchErr } = await supabase
       .from('teams')
       .select('reports')
       .eq('id', teamId)
       .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
 
     const currentReports: TeamReportModel[] = Array.isArray(teamRow?.reports)
       ? teamRow.reports.map((r: any) => ({
@@ -1114,28 +1301,35 @@ export class TeamService {
       : [];
 
     const target = currentReports.find((r) => r.slot === slot);
-    if (target && target.storagePath) {
+    if (!target) return;
+
+    const updatedReports = currentReports.filter((r) => r.slot !== slot);
+
+    // QA-006 Fix: Update database FIRST before deleting storage binary
+    const { error: rpcErr } = await supabase.rpc('update_team_reports', {
+      p_team_id: teamId,
+      p_reports: updatedReports,
+    });
+
+    if (rpcErr) {
+      const { data: updatedRows, error: updateErr } = await supabase
+        .from('teams')
+        .update({ reports: updatedReports, updated_at: new Date().toISOString() })
+        .eq('id', teamId)
+        .select('id');
+      if (updateErr) throw updateErr;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Failed to delete report: team record not found or unauthorized.');
+      }
+    }
+
+    // Only delete storage blob after database record update succeeded
+    if (target.storagePath) {
       try {
         await supabase.storage.from(REPORTS_BUCKET).remove([target.storagePath]);
       } catch (e) {
         console.warn('[TeamService] Error deleting storage blob for report:', e);
       }
-    }
-
-    const updatedReports = currentReports.filter((r) => r.slot !== slot);
-
-    try {
-      const { error: rpcErr } = await supabase.rpc('update_team_reports', {
-        p_team_id: teamId,
-        p_reports: updatedReports,
-      });
-      if (rpcErr) throw rpcErr;
-    } catch (_) {
-      const { error: updateErr } = await supabase
-        .from('teams')
-        .update({ reports: updatedReports, updated_at: new Date().toISOString() })
-        .eq('id', teamId);
-      if (updateErr) throw updateErr;
     }
 
     fastCache.invalidate(`team_${teamId}`);

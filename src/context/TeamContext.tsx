@@ -4,6 +4,7 @@ import { TeamService } from '../services/team.service';
 import { AuthService } from '../services/auth.service';
 import { TeamModel, ProfileModel } from '../types';
 import { useAuth } from './AuthContext';
+import { fastCache } from '../utils/cache';
 
 interface TeamContextType {
   team: TeamModel | null;
@@ -110,35 +111,57 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [userId, isMentor, saveCache]);
 
   useEffect(() => {
-    loadTeamData(false);
-  }, [loadTeamData]);
+    if (!userId) {
+      setTeam(null);
+      setMembers([]);
+      setMentor(null);
+      setLoading(false);
+      isFirstFetch.current = true;
+    } else {
+      loadTeamData(false);
+    }
+  }, [userId, loadTeamData]);
 
   // Realtime updates subscription (runs silently without UI unmount)
   useEffect(() => {
     if (!userId || isMentor) return;
 
+    let debounceTimer: any = null;
+    const handleRealtimeChange = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fastCache.invalidate(`my_team_${userId}`);
+        if (activeTeamRef.current?.id) {
+          fastCache.invalidate(`roster_${activeTeamRef.current.id}`);
+        }
+        fastCache.invalidate('team_');
+        loadTeamData(true);
+      }, 300);
+    };
+
     const channelName = `realtime:team_context_${userId}`;
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, () => {
-        loadTeamData(true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
-        loadTeamData(true);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_transfer_requests' }, () => {
-        loadTeamData(true);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_transfer_requests' }, handleRealtimeChange)
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [userId, isMentor, loadTeamData]);
 
   const refreshTeam = useCallback(async () => {
+    if (userId) {
+      fastCache.invalidate(`my_team_${userId}`);
+      if (activeTeamRef.current?.id) {
+        fastCache.invalidate(`roster_${activeTeamRef.current.id}`);
+      }
+    }
     await loadTeamData(false);
-  }, [loadTeamData]);
+  }, [userId, loadTeamData]);
 
   const contextValue = useMemo<TeamContextType>(
     () => ({

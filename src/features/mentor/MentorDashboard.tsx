@@ -236,7 +236,10 @@ export const MentorDashboard: React.FC = () => {
           subtitle="Active academic projects"
           color="#0b4d88"
           icon={<Users size={22} />}
-          onClick={() => {}}
+          onClick={() => {
+            const section = document.getElementById('assigned-teams-section');
+            if (section) section.scrollIntoView({ behavior: 'smooth' });
+          }}
         />
         <MetricCard
           label="PENDING MEETINGS"
@@ -337,7 +340,7 @@ export const MentorDashboard: React.FC = () => {
       )}
 
       {/* Assigned Teams Section Header & Claim Team CTA */}
-      <div style={{ marginBottom: '16px' }}>
+      <div id="assigned-teams-section" style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h2

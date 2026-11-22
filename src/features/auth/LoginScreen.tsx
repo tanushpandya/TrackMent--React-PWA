@@ -237,6 +237,8 @@ export const LoginScreen: React.FC = () => {
         {/* Error Message */}
         {errorMsg && (
           <div
+            role="alert"
+            aria-live="assertive"
             style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -305,6 +307,7 @@ export const LoginScreen: React.FC = () => {
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword((p) => !p)}
                     style={{
                       position: 'absolute',

@@ -12,11 +12,12 @@ interface CacheEntry<T> {
 class FastCacheManager {
   private memoryCache = new Map<string, CacheEntry<any>>();
   private inFlight = new Map<string, Promise<any>>();
+  private keyGenerations = new Map<string, number>();
   private DEFAULT_TTL_MS = 25000; // 25 seconds default freshness
   private MAX_ENTRIES = 250; // Prevent unbounded memory growth
 
   /**
-   * Deduplicate concurrent in-flight requests and cache results.
+   * Deduplicate concurrent in-flight requests and cache results safely.
    */
   async dedupe<T>(
     key: string,
@@ -34,17 +35,29 @@ class FastCacheManager {
       return this.inFlight.get(key) as Promise<T>;
     }
 
-    // 3. Execute fetcher and register in-flight promise
-    const promise = (async () => {
+    // 3. Capture generation id to guard against invalidation race conditions
+    const startGen = this.keyGenerations.get(key) || 0;
+
+    // 4. Execute fetcher and register in-flight promise
+    let promise!: Promise<T>;
+    promise = (async () => {
       try {
         const result = await fetcher();
-        // Check if key was invalidated while fetch was in-flight
-        if (result !== null && result !== undefined && this.inFlight.has(key)) {
+        // Guard: only cache if key was NOT invalidated while fetch was in flight
+        const currentGen = this.keyGenerations.get(key) || 0;
+        if (
+          result !== null &&
+          result !== undefined &&
+          currentGen === startGen &&
+          this.inFlight.get(key) === promise
+        ) {
           this.set(key, result, ttlMs);
         }
         return result;
       } finally {
-        this.inFlight.delete(key);
+        if (this.inFlight.get(key) === promise) {
+          this.inFlight.delete(key);
+        }
       }
     })();
 
@@ -90,13 +103,15 @@ class FastCacheManager {
     if (!keyPrefixOrPattern) {
       this.memoryCache.clear();
       this.inFlight.clear();
+      this.keyGenerations.clear();
       return;
     }
 
-    // Invalidate cached items
+    // Bump generation for invalidation matching keys
     for (const key of Array.from(this.memoryCache.keys())) {
       if (key.startsWith(keyPrefixOrPattern)) {
         this.memoryCache.delete(key);
+        this.keyGenerations.set(key, (this.keyGenerations.get(key) || 0) + 1);
       }
     }
 
@@ -104,6 +119,7 @@ class FastCacheManager {
     for (const key of Array.from(this.inFlight.keys())) {
       if (key.startsWith(keyPrefixOrPattern)) {
         this.inFlight.delete(key);
+        this.keyGenerations.set(key, (this.keyGenerations.get(key) || 0) + 1);
       }
     }
   }
@@ -114,6 +130,7 @@ class FastCacheManager {
   clearAll(): void {
     this.memoryCache.clear();
     this.inFlight.clear();
+    this.keyGenerations.clear();
   }
 
   /**
