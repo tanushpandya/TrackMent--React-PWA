@@ -86,6 +86,7 @@ class FastCacheManager {
       const oldestKey = this.memoryCache.keys().next().value;
       if (oldestKey) {
         this.memoryCache.delete(oldestKey);
+        this.keyGenerations.delete(oldestKey);
       }
     }
 
@@ -120,6 +121,15 @@ class FastCacheManager {
       if (key.startsWith(keyPrefixOrPattern)) {
         this.inFlight.delete(key);
         this.keyGenerations.set(key, (this.keyGenerations.get(key) || 0) + 1);
+      }
+    }
+
+    // Bounded memory guarantee: prune stale generations if map exceeds ceiling
+    if (this.keyGenerations.size > 500) {
+      for (const k of Array.from(this.keyGenerations.keys())) {
+        if (!this.inFlight.has(k) && !this.memoryCache.has(k)) {
+          this.keyGenerations.delete(k);
+        }
       }
     }
   }

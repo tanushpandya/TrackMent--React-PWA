@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Sparkles, Plus, ExternalLink, Download, Trash2, FileText, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
@@ -71,14 +71,23 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
     }
   };
 
-  const pendingCount = contributions.filter((c) => c.status === 'PENDING').length;
-  const confirmedCount = contributions.filter((c) => c.status === 'CONFIRMED').length;
-  const rejectedCount = contributions.filter((c) => c.status === 'REJECTED').length;
+  const { pendingCount, confirmedCount, rejectedCount } = useMemo(() => {
+    let pending = 0;
+    let confirmed = 0;
+    let rejected = 0;
+    for (let i = 0; i < contributions.length; i++) {
+      const s = contributions[i].status;
+      if (s === 'PENDING') pending++;
+      else if (s === 'CONFIRMED') confirmed++;
+      else if (s === 'REJECTED') rejected++;
+    }
+    return { pendingCount: pending, confirmedCount: confirmed, rejectedCount: rejected };
+  }, [contributions]);
 
-  const filtered = contributions.filter((c) => {
-    if (filter === 'ALL') return true;
-    return c.status === filter;
-  });
+  const filtered = useMemo(() => {
+    if (filter === 'ALL') return contributions;
+    return contributions.filter((c) => c.status === filter);
+  }, [contributions, filter]);
 
   return (
     <div style={{ animation: 'pageIn 0.35s ease both' }}>

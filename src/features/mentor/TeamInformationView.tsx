@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -156,7 +156,18 @@ export const TeamInformationView: React.FC = () => {
     );
   }
 
-  const verifiedContributions = contributions.filter((c) => c.status === 'CONFIRMED');
+  const verifiedContributions = useMemo(
+    () => contributions.filter((c) => c.status === 'CONFIRMED'),
+    [contributions]
+  );
+
+  const membersMap = useMemo(() => {
+    const map = new Map<string, (typeof members)[0]>();
+    for (let i = 0; i < members.length; i++) {
+      map.set(members[i].id, members[i]);
+    }
+    return map;
+  }, [members]);
 
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 8px 40px' }}>
@@ -468,7 +479,7 @@ export const TeamInformationView: React.FC = () => {
                 {evaluations.map((ev) => {
                   const memberIds = Object.keys(ev.memberMarks || {});
                   const isIndividual = memberIds.length === 1;
-                  const targetMember = isIndividual ? members.find((m) => m.id === memberIds[0]) : null;
+                  const targetMember = isIndividual ? membersMap.get(memberIds[0]) : null;
 
                   return (
                     <div

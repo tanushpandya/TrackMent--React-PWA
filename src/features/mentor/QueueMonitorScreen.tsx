@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -71,13 +71,33 @@ export const QueueMonitorScreen: React.FC = () => {
     );
   };
 
-  // Filter meetings for the selected day
-  const dayAppointments = appointments.filter((a) => {
-    const slot = new Date(a.confirmedSlot || a.requestedSlot);
-    return isSameDay(slot, selectedDate);
-  });
+  // Filter meetings for the selected day with memoization
+  const dayAppointments = useMemo(() => {
+    return appointments.filter((a) => {
+      const slot = new Date(a.confirmedSlot || a.requestedSlot);
+      return isSameDay(slot, selectedDate);
+    });
+  }, [appointments, selectedDate]);
 
-  const hours = Array.from({ length: 11 }, (_, i) => i + 8); // 8 AM to 6 PM
+  // Pre-bucket appointments by hour in an O(1) Map to avoid repeated Date parsing in JSX loop
+  const appointmentsByHour = useMemo(() => {
+    const map = new Map<number, AppointmentModel[]>();
+    for (let i = 0; i < dayAppointments.length; i++) {
+      const a = dayAppointments[i];
+      const slot = a.confirmedSlot || a.requestedSlot;
+      if (!slot) continue;
+      const h = new Date(slot).getHours();
+      let bucket = map.get(h);
+      if (!bucket) {
+        bucket = [];
+        map.set(h, bucket);
+      }
+      bucket.push(a);
+    }
+    return map;
+  }, [dayAppointments]);
+
+  const hours = useMemo(() => Array.from({ length: 11 }, (_, i) => i + 8), []); // 8 AM to 6 PM
 
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 8px 40px' }}>
@@ -212,11 +232,8 @@ export const QueueMonitorScreen: React.FC = () => {
             const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
             const hourLabel = `${displayHour.toString().padStart(2, '0')}:00 ${period}`;
 
-            // Check if any appointment is in this hour
-            const inHourApts = dayAppointments.filter((a) => {
-              const d = new Date(a.confirmedSlot || a.requestedSlot);
-              return d.getHours() === hour;
-            });
+            // Check if any appointment is in this hour via O(1) bucketed Map
+            const inHourApts = appointmentsByHour.get(hour) || [];
 
             if (inHourApts.length === 0) return null;
 

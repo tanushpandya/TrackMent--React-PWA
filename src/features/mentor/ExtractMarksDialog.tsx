@@ -65,50 +65,53 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
               );
             });
 
+            // Pre-index evaluations by phase (1, 2, 3) for O(1) member score lookup
+            const phaseEvals = new Map<
+              number,
+              { generic: typeof realEvals[0] | null; byStudent: Map<string, typeof realEvals[0]> }
+            >();
+            [1, 2, 3].forEach((p) => phaseEvals.set(p, { generic: null, byStudent: new Map() }));
+
+            for (let i = 0; i < realEvals.length; i++) {
+              const e = realEvals[i];
+              const pName = (e.phaseName || '').toLowerCase();
+              let phaseNum = 0;
+              if (pName.includes('1')) phaseNum = 1;
+              else if (pName.includes('2')) phaseNum = 2;
+              else if (pName.includes('3')) phaseNum = 3;
+
+              if (phaseNum > 0) {
+                const entry = phaseEvals.get(phaseNum)!;
+                if (!entry.generic) entry.generic = e;
+                if (e.memberMarks) {
+                  for (const mId of Object.keys(e.memberMarks)) {
+                    if (!entry.byStudent.has(mId)) {
+                      entry.byStudent.set(mId, e);
+                    }
+                  }
+                }
+              }
+            }
+
+            const getPhaseData = (phaseNum: number, memberId: string) => {
+              const entry = phaseEvals.get(phaseNum);
+              if (!entry) return { score: null, max: null };
+              const targetEval = entry.byStudent.get(memberId) || entry.generic;
+              if (!targetEval) return { score: null, max: null };
+
+              const score =
+                targetEval.memberMarks && targetEval.memberMarks[memberId] !== undefined
+                  ? targetEval.memberMarks[memberId]
+                  : targetEval.totalMarks;
+              return { score, max: targetEval.maxMarks };
+            };
+
             for (const member of roster) {
               const isLead = member.id === team.leaderId;
 
-              // Find phase 1 evaluation: prefer individual mark for this member over generic cohort mark
-              const p1 =
-                realEvals.find(
-                  (e) =>
-                    e.phaseName.toLowerCase().includes('1') &&
-                    e.memberMarks &&
-                    e.memberMarks[member.id] !== undefined
-                ) || realEvals.find((e) => e.phaseName.toLowerCase().includes('1'));
-              const p1Score = p1
-                ? p1.memberMarks && p1.memberMarks[member.id] !== undefined
-                  ? p1.memberMarks[member.id]
-                  : p1.totalMarks
-                : null;
-
-              // Find phase 2 evaluation
-              const p2 =
-                realEvals.find(
-                  (e) =>
-                    e.phaseName.toLowerCase().includes('2') &&
-                    e.memberMarks &&
-                    e.memberMarks[member.id] !== undefined
-                ) || realEvals.find((e) => e.phaseName.toLowerCase().includes('2'));
-              const p2Score = p2
-                ? p2.memberMarks && p2.memberMarks[member.id] !== undefined
-                  ? p2.memberMarks[member.id]
-                  : p2.totalMarks
-                : null;
-
-              // Find phase 3 evaluation
-              const p3 =
-                realEvals.find(
-                  (e) =>
-                    e.phaseName.toLowerCase().includes('3') &&
-                    e.memberMarks &&
-                    e.memberMarks[member.id] !== undefined
-                ) || realEvals.find((e) => e.phaseName.toLowerCase().includes('3'));
-              const p3Score = p3
-                ? p3.memberMarks && p3.memberMarks[member.id] !== undefined
-                  ? p3.memberMarks[member.id]
-                  : p3.totalMarks
-                : null;
+              const p1Data = getPhaseData(1, member.id);
+              const p2Data = getPhaseData(2, member.id);
+              const p3Data = getPhaseData(3, member.id);
 
               compiledRows.push({
                 teamCode: team.teamCode,
@@ -119,12 +122,12 @@ export const ExtractMarksDialog: React.FC<ExtractMarksDialogProps> = ({
                 usn: member.usn || '',
                 email: member.email || '',
                 isLead,
-                phase1: p1Score,
-                phase1Max: p1 ? p1.maxMarks : null,
-                phase2: p2Score,
-                phase2Max: p2 ? p2.maxMarks : null,
-                phase3: p3Score,
-                phase3Max: p3 ? p3.maxMarks : null,
+                phase1: p1Data.score,
+                phase1Max: p1Data.max,
+                phase2: p2Data.score,
+                phase2Max: p2Data.max,
+                phase3: p3Data.score,
+                phase3Max: p3Data.max,
               });
             }
           })

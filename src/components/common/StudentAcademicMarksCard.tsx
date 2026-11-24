@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Award, ShieldCheck, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { TeamEvaluation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -18,68 +18,78 @@ export const StudentAcademicMarksCard: React.FC<StudentAcademicMarksCardProps> =
   const { user, profile } = useAuth();
   const [expandedEvId, setExpandedEvId] = useState<number | null>(null);
 
-  // 1. Filter out internal system records (e.g. __MARKS_VISIBILITY__)
-  const cleanEvals = (evaluations || []).filter((e) => {
-    const p = (e.phaseName || '').trim();
-    if (!p || p.startsWith('__')) return false;
-    const lower = p.toLowerCase();
-    if (lower.includes('visibility') || lower.includes('dummy') || lower.includes('mock')) {
-      return false;
-    }
-
-    // If individual member marks are set, check if this student is included
-    const hasMemberMarks = e.memberMarks && Object.keys(e.memberMarks).length > 0;
-    if (hasMemberMarks) {
-      const hasId = user?.id && e.memberMarks[user.id] !== undefined;
-      const hasUsn = profile?.usn && e.memberMarks[profile.usn] !== undefined;
-      // If it has individual marks and this student is not in it, it belongs to another teammate
-      if (!hasId && !hasUsn) {
+  // 1. Filter and deduplicate evaluations with memoization and non-allocating key checks
+  const items = useMemo(() => {
+    const cleanEvals = (evaluations || []).filter((e) => {
+      const p = (e.phaseName || '').trim();
+      if (!p || p.startsWith('__')) return false;
+      const lower = p.toLowerCase();
+      if (lower.includes('visibility') || lower.includes('dummy') || lower.includes('mock')) {
         return false;
       }
-    }
-    return true;
-  });
 
-  // 2. Deduplicate by phase name (keeping the latest authentic entry per phase)
-  const phaseMap = new Map<
-    string,
-    { ev: TeamEvaluation; score: number; maxMarks: number }
-  >();
+      // Check if memberMarks is populated without allocating an intermediate array
+      let hasMemberMarks = false;
+      if (e.memberMarks) {
+        for (const _ in e.memberMarks) {
+          hasMemberMarks = true;
+          break;
+        }
+      }
 
-  for (const ev of cleanEvals) {
-    const normKey = ev.phaseName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const isIndividual =
-      (user?.id && ev.memberMarks && ev.memberMarks[user.id] !== undefined) ||
-      (profile?.usn && ev.memberMarks && ev.memberMarks[profile.usn] !== undefined);
+      if (hasMemberMarks && e.memberMarks) {
+        const hasId = user?.id && e.memberMarks[user.id] !== undefined;
+        const hasUsn = profile?.usn && e.memberMarks[profile.usn] !== undefined;
+        // If it has individual marks and this student is not in it, it belongs to another teammate
+        if (!hasId && !hasUsn) {
+          return false;
+        }
+      }
+      return true;
+    });
 
-    const score =
-      user?.id && ev.memberMarks && ev.memberMarks[user.id] !== undefined
-        ? Number(ev.memberMarks[user.id])
-        : profile?.usn && ev.memberMarks && ev.memberMarks[profile.usn] !== undefined
-        ? Number(ev.memberMarks[profile.usn])
-        : Number(ev.totalMarks || 0);
+    // 2. Deduplicate by phase name (keeping the latest authentic entry per phase)
+    const phaseMap = new Map<
+      string,
+      { ev: TeamEvaluation; score: number; maxMarks: number }
+    >();
 
-    const maxMarks = Number(
-      ev.maxMarks ||
-        (normKey.includes('1') ? 40 : normKey.includes('2') ? 60 : normKey.includes('3') ? 100 : 50)
-    );
+    for (let i = 0; i < cleanEvals.length; i++) {
+      const ev = cleanEvals[i];
+      const normKey = ev.phaseName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isIndividual =
+        (user?.id && ev.memberMarks && ev.memberMarks[user.id] !== undefined) ||
+        (profile?.usn && ev.memberMarks && ev.memberMarks[profile.usn] !== undefined);
 
-    const existing = phaseMap.get(normKey);
-    if (!existing) {
-      phaseMap.set(normKey, { ev, score, maxMarks });
-    } else {
-      // Prioritize individual evaluation over older cohort row
-      const existingIsIndiv =
-        (user?.id && existing.ev.memberMarks && existing.ev.memberMarks[user.id] !== undefined) ||
-        (profile?.usn && existing.ev.memberMarks && existing.ev.memberMarks[profile.usn] !== undefined);
+      const score =
+        user?.id && ev.memberMarks && ev.memberMarks[user.id] !== undefined
+          ? Number(ev.memberMarks[user.id])
+          : profile?.usn && ev.memberMarks && ev.memberMarks[profile.usn] !== undefined
+          ? Number(ev.memberMarks[profile.usn])
+          : Number(ev.totalMarks || 0);
 
-      if (isIndividual && !existingIsIndiv) {
+      const maxMarks = Number(
+        ev.maxMarks ||
+          (normKey.includes('1') ? 40 : normKey.includes('2') ? 60 : normKey.includes('3') ? 100 : 50)
+      );
+
+      const existing = phaseMap.get(normKey);
+      if (!existing) {
         phaseMap.set(normKey, { ev, score, maxMarks });
+      } else {
+        // Prioritize individual evaluation over older cohort row
+        const existingIsIndiv =
+          (user?.id && existing.ev.memberMarks && existing.ev.memberMarks[user.id] !== undefined) ||
+          (profile?.usn && existing.ev.memberMarks && existing.ev.memberMarks[profile.usn] !== undefined);
+
+        if (isIndividual && !existingIsIndiv) {
+          phaseMap.set(normKey, { ev, score, maxMarks });
+        }
       }
     }
-  }
 
-  const items = Array.from(phaseMap.values());
+    return Array.from(phaseMap.values());
+  }, [evaluations, user?.id, profile?.usn]);
 
   // If loading or no marks recorded yet, don't show an empty broken card
   if (loading) {

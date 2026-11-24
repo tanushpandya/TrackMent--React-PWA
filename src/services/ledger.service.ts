@@ -12,7 +12,7 @@ export class LedgerService {
     if (error) throw error;
 
     // Fetch current team members to guarantee newly joined students are included
-    const currentMembers: { id: string; name: string; usn: string }[] = [];
+    const currentMembersMap = new Map<string, { id: string; name: string; usn: string }>();
     try {
       const { data: tmRows } = await supabase
         .from('team_members')
@@ -23,7 +23,7 @@ export class LedgerService {
         const p = (r.profiles as any) || {};
         const uid = (r.user_id || p.id || '').toString();
         if (uid) {
-          currentMembers.push({
+          currentMembersMap.set(uid, {
             id: uid,
             name: p.full_name?.trim() || 'Team Member',
             usn: p.usn?.trim() || '',
@@ -42,7 +42,7 @@ export class LedgerService {
         seenStudents.add(studentId);
 
         const p = a.profiles || {};
-        const memberInfo = currentMembers.find((m) => m.id === studentId);
+        const memberInfo = currentMembersMap.get(studentId);
 
         attendanceList.push({
           studentId,
