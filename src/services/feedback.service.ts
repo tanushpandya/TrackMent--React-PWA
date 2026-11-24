@@ -39,6 +39,25 @@ export class FeedbackService {
     return this.submit(params);
   }
 
+  static async createFeedback(params: {
+    teamId: number;
+    mentorId: string;
+    comment?: string;
+    content?: string | null;
+    directiveType?: string;
+    feedbackType?: FeedbackType;
+    sendEmailNotification?: boolean;
+  }): Promise<FeedbackModel> {
+    const fType = (params.feedbackType || (params.directiveType === 'MEET_ME' ? 'MEET_ME' : 'COMMENT')) as FeedbackType;
+    return this.submit({
+      teamId: params.teamId,
+      mentorId: params.mentorId,
+      feedbackType: fType,
+      content: params.comment || params.content || null,
+      sendEmailNotification: params.sendEmailNotification,
+    });
+  }
+
   static async toggleContributionThumbsUp(params: {
     teamId: number;
     mentorId: string;
@@ -65,7 +84,7 @@ export class FeedbackService {
         mentor_id: params.mentorId,
         contribution_id: params.contributionId,
         feedback_type: 'THUMBS_UP',
-        content: 'Acknowledged contribution deliverable 👍',
+        content: 'Acknowledged contribution deliverable.',
       });
       if (insErr) throw insErr;
       fastCache.invalidate(`feedback_${params.teamId}`);
@@ -129,7 +148,7 @@ export class FeedbackService {
   }): Promise<number> {
     if (params.teamIds.length === 0) return 0;
     const categoryTag = params.category ? `[${params.category.toUpperCase()}] ` : '';
-    const formattedContent = `📢 ${categoryTag}${params.subject.trim()}\n\n${params.message.trim()}`;
+    const formattedContent = `${categoryTag}${params.subject.trim()}\n\n${params.message.trim()}`;
 
     // QA-003 Fix: Use 'COMMENT' to satisfy SQL check constraint IN ('COMMENT', 'THUMBS_UP', 'MEET_ME')
     const rows = params.teamIds.map((teamId) => ({
@@ -151,7 +170,7 @@ export class FeedbackService {
       await supabase.functions.invoke('send-team-notification', {
         body: {
           teamIds: params.teamIds,
-          subject: `📢 [TrackMent Broadcast] ${params.subject}`,
+          subject: `[TrackMent Broadcast] ${params.subject}`,
           message: params.message,
         },
       });

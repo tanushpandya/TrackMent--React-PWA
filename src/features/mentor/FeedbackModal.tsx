@@ -50,7 +50,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       feedbackType === 'MEET_ME'
         ? 'Please come meet me at the department/staff room to discuss your project progress.'
         : feedbackType === 'THUMBS_UP'
-        ? 'Great progress, keep up the good work! 👍'
+        ? 'Great progress, keep up the good work.'
         : trimmed;
 
     try {
@@ -126,7 +126,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
             }}
           >
             <ThumbsUp size={16} />
-            Endorse 👍
+            Endorse
           </button>
 
           <button

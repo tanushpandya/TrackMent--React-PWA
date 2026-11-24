@@ -70,7 +70,7 @@ export const UpdateProgressModal: React.FC = () => {
       });
       await refreshTeam();
       showToast(`Progress successfully updated to ${newPct}%!`, 'success');
-      navigate('/lead/dashboard');
+      navigate('/student/dashboard');
     } catch (err: any) {
       setError(err?.message || 'Could not save progress. Please try again.');
     } finally {
@@ -83,7 +83,7 @@ export const UpdateProgressModal: React.FC = () => {
       <div style={{ width: '100%', maxWidth: '720px' }}>
         {/* Navigation Back */}
         <button
-          onClick={() => navigate('/lead/dashboard')}
+          onClick={() => navigate('/student/dashboard')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

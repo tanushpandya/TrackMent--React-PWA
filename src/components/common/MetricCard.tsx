@@ -6,18 +6,14 @@ interface MetricCardProps {
   note?: string;
   subtitle?: string;
   subtext?: string;
-  variant?: 1 | 2 | 3 | 4;
-  color?: string;
   icon?: React.ReactNode;
+  badge?: React.ReactNode;
+  actionText?: string;
+  onAction?: () => void;
   onClick?: () => void;
+  iconBg?: string;
+  iconColor?: string;
 }
-
-const gradientVariants = {
-  1: 'linear-gradient(90deg, #2676ac, #48c4cf, rgba(90, 190, 194, 0))',
-  2: 'linear-gradient(90deg, #44a99e, #a0dcca, rgba(160, 220, 202, 0))',
-  3: 'linear-gradient(90deg, #4f8ac2, #a7d1ec, rgba(167, 209, 236, 0))',
-  4: 'linear-gradient(90deg, #c19456, #f0cf91, rgba(240, 207, 145, 0))',
-};
 
 export const MetricCard: React.FC<MetricCardProps> = ({
   label,
@@ -25,82 +21,61 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   note,
   subtitle,
   subtext,
-  variant = 1,
-  color,
   icon,
+  badge,
+  actionText,
+  onAction,
   onClick,
+  iconBg = 'bg-[#EFF6FF] border-[#BFDBFE]',
+  iconColor = 'text-[#1D63ED]',
 }) => {
-  const displayNote = note || subtitle || subtext;
+  const caption = note ?? subtitle ?? subtext;
 
   return (
-    <article
+    <div
       onClick={onClick}
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        border: '1px solid rgba(255, 255, 255, 0.96)',
-        borderRadius: 19,
-        background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(244, 250, 251, 0.82))',
-        boxShadow: '0 18px 42px rgba(12, 64, 101, 0.14)',
-        backdropFilter: 'blur(11px)',
-        padding: '18px 20px',
-        animation: 'pageIn 0.35s ease both',
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-      }}
+      className={`surface-card p-5 flex flex-col justify-between gap-3 transition-all ${
+        onClick ? 'cursor-pointer hover:border-[#1D63ED]/60' : ''
+      }`}
     >
-      {/* Top accent line */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3.5,
-          background: color || gradientVariants[variant],
-        }}
-      />
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: '0.9px',
-            fontWeight: 850,
-            color: '#738C9C',
-            textTransform: 'uppercase',
-          }}
-        >
-          {label}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            {label}
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2.5 flex-wrap">
+            <span className="text-3xl font-bold text-[#0A2540] font-mono tabular-nums leading-none">
+              {value}
+            </span>
+            {badge && <div>{badge}</div>}
+          </div>
         </div>
-        {icon && <div style={{ color: color || '#2676ac', opacity: 0.85 }}>{icon}</div>}
+        {icon && (
+          <div
+            className={`w-9 h-9 rounded-lg border ${iconBg} ${iconColor} flex items-center justify-center shrink-0 shadow-2xs`}
+          >
+            {icon}
+          </div>
+        )}
       </div>
 
-      <div
-        style={{
-          marginTop: 10,
-          fontSize: 27,
-          letterSpacing: '-1px',
-          fontWeight: 900,
-          color: color || '#154E79',
-          lineHeight: 1.1,
-        }}
-      >
-        {value}
-      </div>
-
-      {displayNote && (
-        <div
-          style={{
-            marginTop: 5,
-            fontSize: 11,
-            fontWeight: 650,
-            color: '#5D988D',
-          }}
-        >
-          {displayNote}
+      {(caption || actionText) && (
+        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs gap-2 flex-wrap">
+          <span className="text-slate-500 truncate">{caption}</span>
+          {actionText && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onAction) onAction();
+              }}
+              className="font-semibold text-[#1D63ED] hover:underline shrink-0"
+            >
+              {actionText}
+            </button>
+          )}
         </div>
       )}
-    </article>
+    </div>
   );
 };

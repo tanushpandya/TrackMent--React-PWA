@@ -1,91 +1,191 @@
 import React, { useState } from 'react';
-import { FluidMascot, MascotMood } from './FluidMascot';
-import { useToast } from '../../context/ToastContext';
 
-interface MascotCompanionBannerProps {
-  defaultMood?: MascotMood;
+export interface MascotCompanionBannerProps {
   defaultMessage?: string;
-  subtitle?: string;
+  defaultMood?: string;
   isLead?: boolean;
+  subtitle?: string;
+  actionText?: string;
+  onAction?: () => void;
+  mentorName?: string;
 }
 
 export const MascotCompanionBanner: React.FC<MascotCompanionBannerProps> = ({
-  defaultMood = 'happy',
-  defaultMessage = 'I’m here to help you keep moving.',
-  subtitle = 'Your friendly project companion is cheering you on.',
+  defaultMessage,
+  subtitle,
+  actionText,
+  onAction,
+  mentorName,
 }) => {
   const [cheered, setCheered] = useState(false);
-  const { showToast } = useToast();
+  const [quoteIdx, setQuoteIdx] = useState(0);
 
-  const toggleCheer = () => {
-    const next = !cheered;
-    setCheered(next);
-    showToast(next ? 'You’ve got this! ✨' : 'I’m here for you! ✨');
+  const mentorLabel = mentorName ? `${mentorName}'s` : 'your mentor\'s';
+
+  const quotes = [
+    {
+      headline: `Your team is on track for ${mentorLabel} next review`,
+      sub: 'All milestones aligned. Keep pushing forward together.',
+    },
+    {
+      headline: 'Strong sprint momentum — keep your artifacts documented',
+      sub: 'Up-to-date test coverage and architecture notes streamline evaluations.',
+    },
+    {
+      headline: 'Consistent contributions build a stronger CIE evaluation',
+      sub: 'Keep your proof-of-work log updated ahead of your upcoming consultation.',
+    },
+  ];
+
+  const handleOrbClick = () => {
+    if (!cheered) {
+      setCheered(true);
+      setQuoteIdx(0);
+    } else {
+      const next = quoteIdx + 1;
+      if (next < quotes.length) {
+        setQuoteIdx(next);
+      } else {
+        setCheered(false);
+      }
+    }
   };
 
-  const activeMood: MascotMood = cheered ? 'excited' : defaultMood;
-  const activeMessage = cheered
-    ? 'You’ve got this! Every step moves your project forward ✨'
-    : defaultMessage;
+  const currentQuote = quotes[quoteIdx % quotes.length];
+  const headline = cheered
+    ? currentQuote.headline
+    : defaultMessage || 'Stay on top of your upcoming project milestones.';
+  const subline = cheered
+    ? currentQuote.sub
+    : subtitle || 'Your project companion tracks progress and upcoming reviews.';
 
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 18,
-        maxWidth: 680,
-        margin: '0 0 24px 0',
-        padding: '14px 20px',
-        borderRadius: 20,
-        background: 'linear-gradient(115deg, rgba(255, 255, 255, 0.92), rgba(212, 241, 245, 0.82))',
-        border: '1px solid rgba(255, 255, 255, 0.95)',
-        boxShadow: '0 10px 28px rgba(39, 104, 137, 0.12)',
-        animation: 'pageIn 0.4s ease both',
-      }}
+      className={`surface-card p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all mb-5 ${
+        cheered
+          ? 'bg-gradient-to-r from-white via-[#EFF6FF]/75 to-[#ECFDF5]/65'
+          : 'bg-gradient-to-r from-white to-[#EFF6FF]/70'
+      }`}
     >
-      <FluidMascot mood={activeMood} size={78} onTap={toggleCheer} />
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 850,
-            color: '#102F48',
-            lineHeight: 1.4,
-          }}
-        >
-          {activeMessage}
-        </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: '#5E788C',
-            marginTop: 4,
-            lineHeight: 1.5,
-          }}
-        >
-          {subtitle}
-        </div>
+      <div className="flex items-center gap-4 min-w-0">
+        {/* Isolated semantic button for the Companion Orb */}
         <button
-          onClick={toggleCheer}
-          style={{
-            marginTop: 6,
-            padding: 0,
-            background: 'none',
-            border: 'none',
-            color: '#1972A0',
-            fontSize: 11.5,
-            fontWeight: 850,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
+          type="button"
+          onClick={handleOrbClick}
+          aria-label={cheered ? 'Cycle companion tip' : 'View companion tip'}
+          title={cheered ? 'Click to cycle tip' : 'Click for a project tip'}
+          className={`w-12 h-12 shrink-0 rounded-full orb-float focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1D63ED] ${
+            cheered ? 'orb-cheered-ring' : ''
+          }`}
         >
-          {cheered ? 'I’m cheering for you! ✨' : 'Tap to cheer me up ✨'}
+          {cheered ? (
+            <svg viewBox="0 0 64 64" className="w-12 h-12 drop-shadow-sm" aria-hidden="true">
+              <defs>
+                <radialGradient id="orbHappy" cx="35%" cy="30%" r="70%">
+                  <stop offset="0%" stopColor="#7DD3FC" />
+                  <stop offset="55%" stopColor="#2563EB" />
+                  <stop offset="100%" stopColor="#0A2540" />
+                </radialGradient>
+              </defs>
+              <circle cx="32" cy="32" r="28" fill="url(#orbHappy)" />
+              <ellipse
+                cx="23"
+                cy="18"
+                rx="8"
+                ry="4"
+                transform="rotate(-22 23 18)"
+                fill="rgba(255,255,255,0.45)"
+              />
+              <path
+                d="M20 29 Q23 24 26 29"
+                stroke="#FFFFFF"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <path
+                d="M38 29 Q41 24 44 29"
+                stroke="#FFFFFF"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <circle cx="19" cy="35" r="3" fill="rgba(251,113,133,0.55)" />
+              <circle cx="45" cy="35" r="3" fill="rgba(251,113,133,0.55)" />
+              <path
+                d="M25 37 Q32 44 39 37"
+                stroke="#FFFFFF"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 64 64" className="w-12 h-12 drop-shadow-sm" aria-hidden="true">
+              <defs>
+                <radialGradient id="orbBlue" cx="35%" cy="30%" r="70%">
+                  <stop offset="0%" stopColor="#60A5FA" />
+                  <stop offset="55%" stopColor="#1D4ED8" />
+                  <stop offset="100%" stopColor="#0A2540" />
+                </radialGradient>
+              </defs>
+              <circle cx="32" cy="32" r="28" fill="url(#orbBlue)" />
+              <ellipse
+                cx="23"
+                cy="18"
+                rx="8"
+                ry="4"
+                transform="rotate(-22 23 18)"
+                fill="rgba(255,255,255,0.42)"
+              />
+              <path
+                d="M18 24 L25 22"
+                stroke="#DBEAFE"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M46 24 L39 22"
+                stroke="#DBEAFE"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <circle cx="23" cy="30" r="3.2" fill="#0A2540" />
+              <circle cx="22" cy="29" r="1.1" fill="#FFFFFF" />
+              <circle cx="41" cy="30" r="3.2" fill="#0A2540" />
+              <circle cx="40" cy="29" r="1.1" fill="#FFFFFF" />
+              <path
+                d="M26 41 Q32 37 38 41"
+                stroke="#DBEAFE"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          )}
         </button>
+
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold text-[#0A2540]">
+            {headline}
+          </div>
+          <p className="text-xs text-slate-600 mt-0.5">
+            {subline}
+          </p>
+        </div>
       </div>
+
+      {actionText && (
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onAction}
+            className="h-9 px-3.5 rounded-lg bg-[#0F4C81] hover:bg-[#1D63ED] text-white text-xs font-semibold shadow-xs transition-colors"
+          >
+            {actionText}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

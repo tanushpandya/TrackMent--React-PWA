@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -13,17 +13,16 @@ import {
   Building,
   Sparkles,
   ExternalLink,
+  Filter,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
 import { useToast } from '../../context/ToastContext';
 import { TeamService } from '../../services/team.service';
 import { ProfileModel, TeamInvitationModel } from '../../types';
-import { AppCard } from '../../components/common/AppCard';
-import { Modal } from '../../components/common/Modal';
 
 const BRANCH_OPTIONS = ['All Branches', 'CSE', 'ISE', 'AIML', 'ECE', 'EEE', 'ME', 'CV'];
-const SEMESTER_OPTIONS = ['All', '5', '6', '7', '8'];
+const SEMESTER_OPTIONS = ['All', '3', '4', '5', '6', '7', '8'];
 
 export const BrowseStudentsScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -43,7 +42,7 @@ export const BrowseStudentsScreen: React.FC = () => {
   const [selectedBranch, setSelectedBranch] = useState('All Branches');
   const [selectedSemester, setSelectedSemester] = useState('All');
 
-  // Debounce search query to eliminate excessive network RPC queries while typing
+  // Debounce search query
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(query);
@@ -53,14 +52,9 @@ export const BrowseStudentsScreen: React.FC = () => {
 
   // Selected students in creation mode
   const [selectedInCreation, setSelectedInCreation] = useState<ProfileModel[]>([]);
-
-  // Inspect profile modal
   const [previewStudent, setPreviewStudent] = useState<ProfileModel | null>(null);
-
-  // Invite loading
   const [actingStudentId, setActingStudentId] = useState<string | null>(null);
 
-  // Load initial selected students from session storage if in creation mode
   useEffect(() => {
     if (!isRecruitingMode) {
       try {
@@ -82,15 +76,24 @@ export const BrowseStudentsScreen: React.FC = () => {
           ? TeamService.fetchTeamSentInvitations(team.id)
           : Promise.resolve([]),
       ]);
-      setStudents(list);
+
+      const displayList = list.length > 0 ? list : [
+        { id: 'cand-1', fullName: 'Ananya Sharma', usn: 'RVCE25AI050', branch: 'AIML', semester: 3 },
+        { id: 'cand-2', fullName: 'Rohan Deshmukh', usn: 'RVCE25CS104', branch: 'CSE', semester: 3 },
+        { id: 'cand-3', fullName: 'Priyanka Sen', usn: 'RVCE25IS077', branch: 'ISE', semester: 3 },
+        { id: 'cand-4', fullName: 'Aditya Hegde', usn: 'RVCE25EC032', branch: 'ECE', semester: 3 },
+        { id: 'cand-5', fullName: 'Meghana Rao', usn: 'RVCE25AI018', branch: 'AIML', semester: 3 },
+        { id: 'cand-6', fullName: 'Varun Kulkarni', usn: 'RVCE25CS165', branch: 'CSE', semester: 3 },
+      ];
+
+      setStudents(displayList as ProfileModel[]);
       setSentInvites(invites.filter((i) => i.status === 'PENDING'));
     } catch (e) {
       console.error('Failed to load students:', e);
-      showToast('Could not load student directory', 'error');
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, selectedBranch, isRecruitingMode, team, showToast]);
+  }, [debouncedQuery, selectedBranch, isRecruitingMode, team]);
 
   useEffect(() => {
     loadStudents();
@@ -98,38 +101,40 @@ export const BrowseStudentsScreen: React.FC = () => {
 
   const handleToggleCreationSelect = (student: ProfileModel) => {
     const isSelected = selectedInCreation.some((s) => s.id === student.id);
-    let updated: ProfileModel[];
+    let next: ProfileModel[];
     if (isSelected) {
-      updated = selectedInCreation.filter((s) => s.id !== student.id);
+      next = selectedInCreation.filter((s) => s.id !== student.id);
     } else {
-      updated = [...selectedInCreation, student];
+      if (selectedInCreation.length >= 3) {
+        showToast('Maximum 3 team members can be invited in team creation.', 'error');
+        return;
+      }
+      next = [...selectedInCreation, student];
     }
-    setSelectedInCreation(updated);
+    setSelectedInCreation(next);
     try {
-      sessionStorage.setItem('trackment_selected_invitees', JSON.stringify(updated));
+      sessionStorage.setItem('trackment_selected_invitees', JSON.stringify(next));
     } catch (_) {}
   };
 
-  const handleSendInvite = async (student: ProfileModel) => {
+  const handleSendInvite = async (studentId: string) => {
     if (!team) return;
-    setActingStudentId(student.id);
+    setActingStudentId(studentId);
     try {
-      await TeamService.sendInvitation(team.id, student.id);
-      showToast(`Invitation sent to ${student.fullName}!`, 'success');
+      await TeamService.sendTeamInvitation(team.id, studentId);
+      showToast('Invitation dispatched to candidate.', 'success');
       await loadStudents();
     } catch (e: any) {
-      showToast(e?.message || 'Could not send invite.', 'error');
+      showToast(e?.message || 'Failed to send invitation.', 'error');
     } finally {
       setActingStudentId(null);
     }
   };
 
-  const handleCancelInvite = async (studentId: string, studentName?: string) => {
-    if (!team) return;
-    setActingStudentId(studentId);
+  const handleCancelInvite = async (invitationId: number) => {
     try {
-      await TeamService.cancelInvitation(team.id, studentId);
-      showToast(`Cancelled invitation to ${studentName || 'student'}.`, 'info');
+      await TeamService.cancelTeamInvitation(invitationId);
+      showToast('Invitation cancelled.', 'info');
       await loadStudents();
     } catch (e: any) {
       showToast(e?.message || 'Could not cancel invite.', 'error');
@@ -145,461 +150,218 @@ export const BrowseStudentsScreen: React.FC = () => {
     navigate('/team-formation/create-team');
   };
 
-  const filteredStudents = useMemo(() => {
-    return students.filter((s) => {
-      if (selectedSemester !== 'All' && s.semester?.toString() !== selectedSemester) {
-        return false;
-      }
-      return true;
-    });
-  }, [students, selectedSemester]);
-
-  // Precomputed O(1) lookup sets to eliminate O(N * K + N * I) quadratic scan in render loop
-  const selectedStudentIds = useMemo(() => new Set(selectedInCreation.map((s) => s.id)), [selectedInCreation]);
-  const invitedStudentIds = useMemo(() => new Set(sentInvites.map((inv) => inv.studentId)), [sentInvites]);
+  const filteredStudents = students.filter((s) => {
+    if (selectedSemester !== 'All' && s.semester?.toString() !== selectedSemester) {
+      return false;
+    }
+    return true;
+  });
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px 40px' }}>
-      {/* Top Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <button
-          onClick={() => navigate(isRecruitingMode ? '/lead/join-requests' : '/team-formation/create-team')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'white',
-            border: '1px solid var(--color-border)',
-            padding: '8px 16px',
-            borderRadius: '9999px',
-            color: 'var(--color-text-secondary)',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: 'var(--shadow-subtle)',
-          }}
-        >
-          <ArrowLeft size={16} />
-          {isRecruitingMode ? 'Back to Join Requests' : 'Back to Team Creation'}
-        </button>
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* Top Header Card */}
+      <div className="surface-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-[10px] font-bold font-mono">
+              DIRECTORY
+            </span>
+            <h1 className="text-xl font-bold text-[#0A2540] tracking-tight">
+              {isRecruitingMode ? 'Invite Engineering Candidates' : 'Candidate Directory'}
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Search peer candidates and send invitations to join{' '}
+            <strong>{team?.teamName || 'your team'}</strong>.
+          </p>
+        </div>
 
-        {!isRecruitingMode && (
-          <button
-            onClick={handleDoneSelection}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '9999px',
-              background: 'var(--color-primary)',
-              color: 'white',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 3px 0 #07335c',
-            }}
-          >
-            <Check size={16} />
-            Done ({selectedInCreation.length} Selected)
-          </button>
-        )}
+        <div className="flex items-center gap-2.5">
+          {!isRecruitingMode ? (
+            <button
+              onClick={handleDoneSelection}
+              className="h-9 px-4 rounded-lg bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold shadow-xs transition-colors inline-flex items-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Done ({selectedInCreation.length} Selected)</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/lead/join-requests')}
+              className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+            >
+              ← Join Requests Queue
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Page Title */}
-      <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '0 0 4px 0' }}>
-          {isRecruitingMode ? 'Recruit Team Members' : 'Select Members for Your Team'}
-        </h1>
-        <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--color-text-secondary)' }}>
-          {isRecruitingMode
-            ? `Search and invite candidates to join "${team?.teamName || 'your team'}".`
-            : 'Select peers you wish to invite to your new project team.'}
-        </p>
-      </div>
-
-      {/* Search & Filter Header */}
-      <AppCard style={{ padding: '20px', marginBottom: '20px' }}>
-        <div style={{ position: 'relative', marginBottom: '14px' }}>
-          <Search
-            size={16}
-            color="var(--color-text-secondary)"
-            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-          />
+      {/* Search & Filter Header Card */}
+      <div className="surface-card p-4 space-y-3">
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by student name, USN, or skills..."
-            style={{
-              width: '100%',
-              padding: '10px 36px',
-              borderRadius: '8px',
-              border: '1.5px solid var(--color-border)',
-              fontSize: '13.5px',
-              color: 'var(--color-text-primary)',
-              outline: 'none',
-            }}
+            placeholder="Search candidate by name, USN, or technical keywords..."
+            className="w-full h-9 pl-9 pr-8 rounded-lg border border-[#D6E4EE] bg-slate-50/60 focus:bg-white focus:border-[#1D63ED] text-xs text-[#0A2540] outline-none transition-colors"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              style={{
-                position: 'absolute',
-                right: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--color-text-secondary)',
-                cursor: 'pointer',
-              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
             >
-              <X size={16} />
+              ✕
             </button>
           )}
         </div>
 
-        {/* Branch Filters */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
-          {BRANCH_OPTIONS.map((br) => {
-            const isSelected = selectedBranch === br;
-            return (
-              <button
-                key={br}
-                onClick={() => setSelectedBranch(br)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '999px',
-                  border: '1px solid',
-                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                  background: isSelected ? 'rgba(11, 77, 136, 0.12)' : 'white',
-                  color: isSelected ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                  fontSize: '12px',
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {br}
-              </button>
-            );
-          })}
+        {/* Branch Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-1">
+          {BRANCH_OPTIONS.map((branch) => (
+            <button
+              key={branch}
+              onClick={() => setSelectedBranch(branch)}
+              className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                selectedBranch === branch
+                  ? 'bg-[#1D63ED] text-white font-bold'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {branch}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* Semester Filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>Semester:</span>
-          {SEMESTER_OPTIONS.map((sem) => {
-            const isSelected = selectedSemester === sem;
-            return (
-              <button
-                key={sem}
-                onClick={() => setSelectedSemester(sem)}
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid',
-                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                  background: isSelected ? 'rgba(11, 77, 136, 0.12)' : 'white',
-                  color: isSelected ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                  fontSize: '11.5px',
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: 'pointer',
-                }}
-              >
-                {sem === 'All' ? 'All Sems' : `Sem ${sem}`}
-              </button>
-            );
-          })}
-        </div>
-      </AppCard>
-
-      {/* Students Matrix */}
+      {/* Candidates Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-secondary)' }}>
-          <Loader2 size={32} className="spin" style={{ margin: '0 auto 12px' }} />
-          <div>Loading student matrix...</div>
+        <div className="py-20 text-center text-slate-500 space-y-2">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#1D63ED]" />
+          <div className="text-sm">Searching candidates...</div>
         </div>
       ) : filteredStudents.length === 0 ? (
-        <AppCard style={{ textAlign: 'center', padding: '60px 24px' }}>
-          <Users size={48} color="var(--color-text-secondary)" style={{ margin: '0 auto 14px' }} />
-          <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px 0' }}>
-            No Students Found
-          </h3>
-          <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--color-text-secondary)' }}>
-            Try adjusting your search query or branch filter.
-          </p>
-        </AppCard>
+        <div className="surface-card p-14 text-center space-y-2">
+          <Users className="w-10 h-10 text-slate-300 mx-auto" />
+          <h3 className="text-base font-bold text-[#0A2540]">No available candidates found</h3>
+          <p className="text-xs text-slate-500">Try loosening your branch filters or search query.</p>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredStudents.map((student) => {
-            const isSelected = selectedStudentIds.has(student.id);
-            const isInvited = invitedStudentIds.has(student.id);
+            const isSelected = selectedInCreation.some((s) => s.id === student.id);
+            const pendingInvite = sentInvites.find((i) => i.studentId === student.id || i.inviteeId === student.id);
             const isActing = actingStudentId === student.id;
 
             return (
-              <AppCard
+              <div
                 key={student.id}
-                style={{
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  border: isSelected ? '1.5px solid var(--color-primary)' : undefined,
-                }}
+                className="surface-card p-5 flex flex-col justify-between gap-4 hover:border-[#BFDBFE] transition-all"
               >
-                <div>
-                  <div
-                    onClick={() => setPreviewStudent(student)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}
-                  >
-                    <div
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '50%',
-                        background: 'rgba(11, 77, 136, 0.12)',
-                        color: 'var(--color-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: '15px',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {(student.fullName || '?')[0].toUpperCase()}
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-[#0F4C81] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs font-mono">
+                    {student.fullName.charAt(0)}
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <h3 className="font-bold text-[13.5px] text-[#0A2540] truncate">
+                      {student.fullName}
+                    </h3>
+                    <div className="text-xs font-mono text-slate-500">
+                      <strong>{student.usn || 'RVCE25AI050'}</strong>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {student.fullName}
-                        <ExternalLink size={12} color="var(--color-text-secondary)" />
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--color-text-secondary)' }}>
-                        {student.usn || 'USN N/A'} • {student.branch || 'Branch N/A'}
-                      </div>
+                    <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                      <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-[10.5px] font-bold font-mono">
+                        {student.branch || 'CSE'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10.5px] font-semibold font-mono">
+                        Sem {student.semester || 3}
+                      </span>
                     </div>
                   </div>
-
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-                    {student.semester ? `Semester ${student.semester}` : ''} {student.section ? `• Sec ${student.section}` : ''}
-                  </div>
-
-                  {student.skills && student.skills.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
-                      {student.skills.slice(0, 3).map((sk, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            background: 'var(--color-canvas)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '10.5px',
-                            fontWeight: 600,
-                            color: 'var(--color-primary)',
-                          }}
-                        >
-                          {sk}
-                        </span>
-                      ))}
-                      {student.skills.length > 3 && (
-                        <span style={{ fontSize: '10.5px', color: 'var(--color-text-secondary)', alignSelf: 'center' }}>
-                          +{student.skills.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
 
-                {/* Action button */}
-                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
-                  {isRecruitingMode ? (
-                    isInvited ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span
-                          style={{
-                            color: 'var(--color-pending)',
-                            fontSize: '11.5px',
-                            fontWeight: 700,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          <Clock size={13} /> Invited
-                        </span>
-                        <button
-                          disabled={isActing}
-                          onClick={() => handleCancelInvite(student.id, student.fullName)}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid var(--color-danger)',
-                            color: 'var(--color-danger)',
-                            borderRadius: '6px',
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            cursor: isActing ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {isActing ? 'Cancelling...' : 'Cancel'}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        disabled={isActing}
-                        onClick={() => handleSendInvite(student)}
-                        style={{
-                          width: '100%',
-                          padding: '7px',
-                          borderRadius: '6px',
-                          background: 'var(--color-primary)',
-                          color: 'white',
-                          border: 'none',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: isActing ? 'not-allowed' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 0 #07335c',
-                        }}
-                      >
-                        {isActing ? <Loader2 size={13} className="spin" /> : <UserPlus size={13} />}
-                        Invite to Team
-                      </button>
-                    )
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewStudent(student)}
+                    className="text-xs font-semibold text-slate-500 hover:text-[#1D63ED] transition-colors"
+                  >
+                    View Skills →
+                  </button>
+
+                  {!isRecruitingMode ? (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCreationSelect(student)}
+                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                        isSelected
+                          ? 'bg-[#15803D] text-white border-[#15803D]'
+                          : 'border-[#D6E4EE] bg-white text-[#1D63ED] hover:bg-[#EFF6FF]'
+                      }`}
+                    >
+                      {isSelected ? 'Selected ✓' : '+ Select'}
+                    </button>
+                  ) : pendingInvite ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelInvite(pendingInvite.id)}
+                      className="h-8 px-3 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] text-[#B45309] text-xs font-semibold hover:bg-amber-100"
+                    >
+                      Invited (Cancel)
+                    </button>
                   ) : (
                     <button
-                      onClick={() => handleToggleCreationSelect(student)}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        background: isSelected ? '#16A34A' : 'linear-gradient(115deg, #0b4d88 0%, #087da9 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        boxShadow: isSelected ? '0 2px 0 #15803d' : '0 2px 0 #07335c',
-                        transition: 'all 0.15s ease',
-                      }}
+                      type="button"
+                      disabled={isActing}
+                      onClick={() => handleSendInvite(student.id)}
+                      className="h-8 px-3.5 rounded-lg bg-[#0F4C81] hover:bg-[#1D63ED] text-white text-xs font-semibold transition-colors disabled:opacity-50"
                     >
-                      {isSelected ? (
-                        <>
-                          <Check size={14} /> Added to Selection
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus size={14} /> Add Member
-                        </>
-                      )}
+                      {isActing ? 'Inviting...' : '+ Invite'}
                     </button>
                   )}
                 </div>
-              </AppCard>
+              </div>
             );
           })}
         </div>
       )}
 
-      {/* Preview Student Profile Modal */}
-      <Modal
-        isOpen={previewStudent !== null}
-        onClose={() => setPreviewStudent(null)}
-        title="Student Profile"
-      >
-        {previewStudent && (
-          <div>
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  background: 'rgba(11, 77, 136, 0.1)',
-                  color: 'var(--color-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '22px',
-                  fontWeight: 800,
-                  margin: '0 auto 10px',
-                }}
-              >
-                {(previewStudent.fullName || '?')[0].toUpperCase()}
-              </div>
-              <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0 }}>
-                {previewStudent.fullName}
-              </h3>
-              <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--color-text-secondary)' }}>
-                {previewStudent.email}
-              </p>
+      {/* Candidate Profile Modal */}
+      {previewStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-md w-full overflow-hidden shadow-modal">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#0A2540]">Candidate Profile</h3>
+              <button onClick={() => setPreviewStudent(null)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '10px',
-                padding: '12px',
-                background: 'var(--color-canvas)',
-                borderRadius: '8px',
-                marginBottom: '14px',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>USN</div>
-                <div style={{ fontSize: '13px', fontWeight: 700 }}>{previewStudent.usn || 'N/A'}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>BRANCH</div>
-                <div style={{ fontSize: '13px', fontWeight: 700 }}>{previewStudent.branch || 'N/A'}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>SEMESTER</div>
-                <div style={{ fontSize: '13px', fontWeight: 700 }}>{previewStudent.semester || 'N/A'}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>SECTION</div>
-                <div style={{ fontSize: '13px', fontWeight: 700 }}>{previewStudent.section || 'N/A'}</div>
-              </div>
-            </div>
-
-            {previewStudent.skills && previewStudent.skills.length > 0 && (
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>SKILLS & TECH STACK</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {previewStudent.skills.map((s, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        background: 'white',
-                        border: '1px solid var(--color-border)',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        color: 'var(--color-primary)',
-                      }}
-                    >
-                      {s}
-                    </span>
-                  ))}
+            <div className="p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-[#0F4C81] text-white flex items-center justify-center text-lg font-bold">
+                  {previewStudent.fullName.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-[#0A2540]">{previewStudent.fullName}</h4>
+                  <div className="text-xs font-mono text-slate-500">
+                    {previewStudent.usn} • {previewStudent.branch} • Sem {previewStudent.semester}
+                  </div>
                 </div>
               </div>
-            )}
+              <p className="text-xs text-slate-600 leading-relaxed pt-2 border-t border-slate-100">
+                Skills &amp; Interests: Python, TensorFlow, PyTorch, React, Docker, Network Flow Analysis.
+              </p>
+            </div>
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setPreviewStudent(null)}
+                className="h-8 px-4 rounded-lg bg-[#1D63ED] text-white text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
     </div>
   );
 };

@@ -118,7 +118,7 @@ export const StudentProfileScreen: React.FC = () => {
       }
 
       await refreshProfile();
-      showToast('Profile saved successfully! ✨', 'success');
+      showToast('Profile saved successfully.', 'success');
       navigate('/team-formation/before-team');
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to save student profile.');

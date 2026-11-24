@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowUpRight } from 'lucide-react';
 
 interface AppCardProps {
   title?: string;
@@ -15,72 +16,25 @@ export const AppCard: React.FC<AppCardProps> = ({
   subtitle,
   actionText,
   onAction,
-  accent = true,
+  accent = false,
   children,
   style,
 }) => {
   return (
     <div
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        border: '1px solid rgba(255, 255, 255, 0.96)',
-        borderRadius: 19,
-        background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(244, 250, 251, 0.85))',
-        boxShadow: '0 18px 42px rgba(12, 64, 101, 0.15)',
-        backdropFilter: 'blur(12px)',
-        padding: 22,
-        marginBottom: 18,
-        ...style,
-      }}
+      style={style}
+      className={`surface-card relative overflow-hidden p-5 mb-4 ${accent ? 'card-top-accent' : ''}`}
     >
-      {accent && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            background: 'linear-gradient(90deg, #07518d 0%, #087aa9 38%, #28bdca 72%, rgba(40, 189, 202, 0) 100%)',
-          }}
-        />
-      )}
-
       {(title || actionText) && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 14,
-            marginBottom: 16,
-          }}
-        >
-          <div>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="min-w-0">
             {title && (
-              <h2
-                style={{
-                  fontSize: 16,
-                  fontWeight: 850,
-                  color: '#102F48',
-                  lineHeight: 1.25,
-                  margin: 0,
-                }}
-              >
+              <h2 className="text-[15px] font-bold text-[#0A2540] leading-snug">
                 {title}
               </h2>
             )}
             {subtitle && (
-              <p
-                style={{
-                  fontSize: 12,
-                  color: '#70899A',
-                  marginTop: 4,
-                  lineHeight: 1.5,
-                  margin: 0,
-                }}
-              >
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 {subtitle}
               </p>
             )}
@@ -88,18 +42,12 @@ export const AppCard: React.FC<AppCardProps> = ({
 
           {actionText && (
             <button
+              type="button"
               onClick={onAction}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#257DA0',
-                fontSize: 11.5,
-                fontWeight: 850,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#1D63ED] hover:underline whitespace-nowrap shrink-0"
             >
-              {actionText} ↗
+              <span>{actionText}</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

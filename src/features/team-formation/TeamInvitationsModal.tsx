@@ -86,7 +86,7 @@ export const TeamInvitationsModal: React.FC = () => {
       await refreshProfile();
       await refreshTeam();
       if (accept) {
-        navigate('/lead/dashboard');
+        navigate('/student/dashboard');
       } else {
         await loadData();
       }

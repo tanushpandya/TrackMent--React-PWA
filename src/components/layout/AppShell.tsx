@@ -10,10 +10,6 @@ export const AppShell: React.FC = () => {
 
   return (
     <div>
-      {/* Ambient background glow orbs */}
-      <div className="ambient ambient-a" />
-      <div className="ambient ambient-b" />
-
       <div className="app-shell-grid">
         {/* Desktop Sidebar & Mobile Drawer */}
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -35,36 +31,28 @@ export const AppShell: React.FC = () => {
       <style>{`
         .app-shell-grid {
           display: grid;
-          grid-template-columns: 258px minmax(0, 1fr);
+          grid-template-columns: 240px minmax(0, 1fr);
           min-height: 100vh;
         }
         .app-shell-main {
-          max-width: 1190px;
+          max-width: 1200px;
           width: 100%;
           margin: 0 auto;
-          padding: 28px clamp(16px, 4vw, 56px) 90px;
+          padding: 24px clamp(16px, 3vw, 36px) 84px;
           flex: 1;
         }
-        @media (max-width: 800px) {
+        @media (max-width: 767px) {
           .app-shell-grid {
             display: block !important;
           }
           .app-shell-main {
-            padding: 16px 12px 86px !important;
+            padding: 16px 12px 84px !important;
           }
           aside {
             position: fixed !important;
             left: 0 !important;
             top: 0 !important;
-            box-shadow: 18px 0 45px rgba(15, 57, 89, 0.25) !important;
-          }
-          .mobile-only {
-            display: flex !important;
-          }
-        }
-        @media (min-width: 801px) {
-          .mobile-only {
-            display: none !important;
+            box-shadow: 18px 0 45px rgba(10, 37, 64, 0.22) !important;
           }
         }
       `}</style>

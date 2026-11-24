@@ -143,7 +143,7 @@ export const BrowseMentorsScreen: React.FC = () => {
             </p>
 
             <button
-              onClick={() => navigate('/lead/dashboard')}
+              onClick={() => navigate('/student/dashboard')}
               style={{
                 background: 'var(--color-primary)',
                 color: 'white',
@@ -221,7 +221,7 @@ export const BrowseMentorsScreen: React.FC = () => {
           }}
         >
           <button
-            onClick={() => navigate('/lead/dashboard')}
+            onClick={() => navigate('/student/dashboard')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',

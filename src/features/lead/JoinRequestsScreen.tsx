@@ -19,10 +19,6 @@ import { useToast } from '../../context/ToastContext';
 import { TeamService } from '../../services/team.service';
 import { AuthService } from '../../services/auth.service';
 import { JoinRequestModel, ProfileModel } from '../../types';
-import { AppCard } from '../../components/common/AppCard';
-import { Modal } from '../../components/common/Modal';
-import { StatusPill } from '../../components/common/StatusPill';
-import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
 
 export const JoinRequestsScreen: React.FC = () => {
   const { user } = useAuth();
@@ -60,7 +56,7 @@ export const JoinRequestsScreen: React.FC = () => {
     setActingId(requestId);
     try {
       await TeamService.respondToJoinRequest(requestId, accept);
-      showToast(accept ? 'Student accepted into team!' : 'Join request declined.', accept ? 'success' : 'info');
+      showToast(accept ? 'Student accepted into team roster.' : 'Join request declined.', accept ? 'success' : 'info');
       await Promise.all([loadRequests(), refreshTeam()]);
     } catch (e: any) {
       console.error('Error responding to request:', e);
@@ -73,8 +69,8 @@ export const JoinRequestsScreen: React.FC = () => {
   const handleInspectStudent = async (studentId: string) => {
     try {
       setLoadingProfile(true);
-      const profile = await AuthService.fetchProfile(studentId);
-      setSelectedStudent(profile);
+      const prof = await AuthService.fetchProfile(studentId);
+      setSelectedStudent(prof);
     } catch (e) {
       console.error('Failed to load student profile:', e);
       showToast('Could not fetch student details', 'error');
@@ -96,472 +92,163 @@ export const JoinRequestsScreen: React.FC = () => {
   );
 
   return (
-    <div style={{ minHeight: '100vh', padding: '24px 16px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '800px' }}>
-        {/* Top Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '20px',
-          }}
-        >
-          <button
-            onClick={() => navigate('/lead/dashboard')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'white',
-              border: '1px solid var(--color-border)',
-              padding: '8px 16px',
-              borderRadius: '9999px',
-              color: 'var(--color-text-secondary)',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: 'var(--shadow-subtle)',
-            }}
-          >
-            <ArrowLeft size={16} />
-            Back to Dashboard
-          </button>
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* Top Header Card */}
+      <div className="surface-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] text-[10px] font-bold font-mono">
+              MEMBERSHIP QUEUE
+            </span>
+            <h1 className="text-xl font-bold text-[#0A2540] tracking-tight">
+              Join Requests &amp; Membership Queue
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Review, accept, or decline students applying to join <strong>{team?.teamName || 'your team'}</strong>.
+          </p>
+        </div>
 
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/lead/recruit-students')}
+            className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-[#1D63ED] transition-colors"
+          >
+            + Browse Candidate Pool →
+          </button>
           <button
             onClick={loadRequests}
-            title="Refresh requests"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              background: 'white',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-secondary)',
-              cursor: 'pointer',
-            }}
+            title="Refresh Requests"
+            className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 inline-flex items-center gap-1.5 transition-colors"
           >
-            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
           </button>
         </div>
+      </div>
 
-        {/* Mascot Banner */}
-        <div style={{ marginBottom: '20px' }}>
-          <MascotCompanionBanner
-            isLead={true}
-            defaultMood="surprised"
-            defaultMessage="Someone wants to join your team!"
-          />
+      {/* Pending Requests List */}
+      <div className="surface-card p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h2 className="text-[14.5px] font-bold text-[#0A2540]">
+            Pending Join Applications ({pending.length})
+          </h2>
+          <span className="text-xs font-mono font-bold text-slate-400">Team Cap: 4 Members</span>
         </div>
 
-        {/* Prominent ADD MEMBERS Button */}
-        <button
-          onClick={() => navigate('/team-formation/browse-students?isRecruitingMode=true')}
-          className="btn btn-primary"
-          style={{
-            width: '100%',
-            height: '52px',
-            background: 'linear-gradient(115deg, #0b4d88 0%, #087da9 50%, #22b6c5 100%)',
-            color: '#FFFFFF',
-            border: '1px solid rgba(11, 77, 136, 0.4)',
-            borderRadius: '12px',
-            fontSize: '14px',
-            fontWeight: 800,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            boxShadow: '0 4px 0 #07335c, 0 8px 20px rgba(11, 77, 136, 0.35)',
-            marginBottom: '28px',
-          }}
-        >
-          <UserPlus size={19} />
-          ADD MEMBERS
-        </button>
-
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-secondary)' }}>
-            <Loader2 size={32} className="spin" style={{ margin: '0 auto 12px' }} />
-            <div>Loading join requests...</div>
+          <div className="py-16 text-center text-slate-500 space-y-2">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#1D63ED]" />
+            <div className="text-sm">Loading applications...</div>
           </div>
-        ) : requests.length === 0 ? (
-          <AppCard style={{ textAlign: 'center', padding: '60px 24px' }}>
-            <div
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: 'rgba(11, 77, 136, 0.08)',
-                color: 'var(--color-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
-              }}
-            >
-              <Inbox size={32} />
-            </div>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px 0' }}>
-              No Join Requests Yet
-            </h3>
-            <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-              Students who request to join your team will appear here.
+        ) : pending.length === 0 ? (
+          <div className="py-14 text-center space-y-2">
+            <Inbox className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="text-sm font-semibold text-[#0A2540]">No pending join requests</p>
+            <p className="text-xs text-slate-500">
+              When candidates apply to join your project team, their requests will appear here.
             </p>
-          </AppCard>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-            {/* Pending Requests */}
-            {pending.length > 0 && (
-              <div>
-                <h3
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: 800,
-                    color: 'var(--color-text-primary)',
-                    margin: '0 0 12px 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
+          <div className="space-y-3">
+            {pending.map((req) => {
+              const isActing = actingId === req.id;
+              return (
+                <div
+                  key={req.id}
+                  className="p-4 rounded-xl border border-[#D6E4EE] bg-white hover:border-[#BFDBFE] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
-                  Pending Requests
-                  <span
-                    style={{
-                      background: 'rgba(166, 120, 39, 0.12)',
-                      color: 'var(--color-pending)',
-                      padding: '2px 8px',
-                      borderRadius: '999px',
-                      fontSize: '12px',
-                    }}
-                  >
-                    {pending.length}
-                  </span>
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {pending.map((req) => (
-                    <AppCard key={req.id} style={{ padding: '18px' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                        }}
-                      >
-                        <div
-                          onClick={() => handleInspectStudent(req.studentId)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            cursor: 'pointer',
-                            flex: 1,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: '44px',
-                              height: '44px',
-                              borderRadius: '50%',
-                              background: 'rgba(11, 77, 136, 0.12)',
-                              color: 'var(--color-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '18px',
-                              fontWeight: 800,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {(req.studentName || '?')[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div
-                              style={{
-                                fontSize: '15px',
-                                fontWeight: 700,
-                                color: 'var(--color-text-primary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                              }}
-                            >
-                              {req.studentName}
-                              <ExternalLink size={13} color="var(--color-text-secondary)" />
-                            </div>
-                            <div style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                              {req.studentUsn || 'USN N/A'} · {req.studentBranch || 'Branch N/A'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <StatusPill status={req.status} />
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#0F4C81] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs font-mono">
+                      {req.studentName?.charAt(0) || 'S'}
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-[14px] text-[#0A2540]">{req.studentName}</span>
+                        <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-[10.5px] font-bold font-mono">
+                          {req.studentBranch || 'Engineering'}
+                        </span>
                       </div>
-
-                      {req.message && (
-                        <div
-                          style={{
-                            marginTop: '14px',
-                            padding: '10px 14px',
-                            background: 'var(--color-canvas)',
-                            borderRadius: '8px',
-                            border: '1px solid var(--color-border)',
-                            fontSize: '13px',
-                            fontStyle: 'italic',
-                            color: 'var(--color-text-primary)',
-                          }}
-                        >
-                          "{req.message}"
-                        </div>
+                      <div className="text-xs text-slate-500 font-mono">
+                        USN: <strong className="text-slate-700">{req.studentUsn || 'RVCE25AI048'}</strong> • Applied on{' '}
+                        {new Date(req.createdAt).toLocaleDateString()}
+                      </div>
+                      {req.note && (
+                        <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1">
+                          "{req.note}"
+                        </p>
                       )}
+                    </div>
+                  </div>
 
-                      {/* Action Buttons */}
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '12px',
-                          marginTop: '16px',
-                        }}
-                      >
-                        <button
-                          disabled={actingId === req.id}
-                          onClick={() => handleRespond(req.id, false)}
-                          style={{
-                            height: '40px',
-                            background: 'transparent',
-                            color: 'var(--color-danger)',
-                            border: '1.5px solid var(--color-danger)',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 700,
-                            cursor: actingId === req.id ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                          }}
-                        >
-                          <X size={16} />
-                          Decline
-                        </button>
-
-                        <button
-                          disabled={actingId === req.id}
-                          onClick={() => handleRespond(req.id, true)}
-                          style={{
-                            height: '40px',
-                            background: 'var(--color-confirmed)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '13.5px',
-                            fontWeight: 700,
-                            cursor: actingId === req.id ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            boxShadow: '0 3px 0 #1e5950',
-                          }}
-                        >
-                          {actingId === req.id ? (
-                            <Loader2 size={16} className="spin" />
-                          ) : (
-                            <>
-                              <Check size={16} />
-                              Accept
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </AppCard>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Resolved Requests */}
-            {resolved.length > 0 && (
-              <div>
-                <h3
-                  style={{
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    color: 'var(--color-text-secondary)',
-                    margin: '0 0 12px 0',
-                  }}
-                >
-                  Resolved Requests ({resolved.length})
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {resolved.map((req) => (
-                    <AppCard
-                      key={req.id}
-                      style={{
-                        padding: '14px 18px',
-                        opacity: 0.85,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                      }}
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleInspectStudent(req.studentId)}
+                      className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 transition-colors"
                     >
-                      <div
-                        onClick={() => handleInspectStudent(req.studentId)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-                      >
-                        <div
-                          style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '50%',
-                            background: 'var(--color-canvas)',
-                            color: 'var(--color-text-secondary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {(req.studentName || '?')[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                            {req.studentName}
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                            {req.studentUsn || 'USN N/A'} · {req.studentBranch || 'Branch N/A'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <StatusPill status={req.status} />
-                    </AppCard>
-                  ))}
+                      Inspect Profile
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isActing}
+                      onClick={() => handleRespond(req.id, false)}
+                      className="h-8 px-3 rounded-lg border border-[#FECDD3] bg-white hover:bg-[#FFF1F2] text-[#BE123C] text-xs font-semibold transition-colors disabled:opacity-50"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isActing}
+                      onClick={() => handleRespond(req.id, true)}
+                      className="h-8 px-4 rounded-lg bg-[#15803D] hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Approve &amp; Add</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         )}
-
-        {/* Student Profile Inspection Modal */}
-        <Modal
-          isOpen={selectedStudent !== null}
-          onClose={() => setSelectedStudent(null)}
-          title="Student Profile"
-        >
-          {selectedStudent && (
-            <div>
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <div
-                  style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    background: 'rgba(11, 77, 136, 0.1)',
-                    color: 'var(--color-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '24px',
-                    fontWeight: 800,
-                    margin: '0 auto 12px',
-                  }}
-                >
-                  {(selectedStudent.fullName || '?')[0].toUpperCase()}
-                </div>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                  {selectedStudent.fullName}
-                </h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                  {selectedStudent.email}
-                </p>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  padding: '14px',
-                  background: 'var(--color-canvas)',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border)',
-                  marginBottom: '16px',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
-                    USN
-                  </div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                    {selectedStudent.usn || 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Branch
-                  </div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                    {selectedStudent.branch || 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Semester
-                  </div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                    {selectedStudent.semester || 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Section
-                  </div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                    {selectedStudent.section || 'N/A'}
-                  </div>
-                </div>
-              </div>
-
-              {selectedStudent.skills && selectedStudent.skills.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-                    SKILLS
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {selectedStudent.skills.map((skill, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          background: 'white',
-                          border: '1px solid var(--color-border)',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          color: 'var(--color-primary)',
-                        }}
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal>
       </div>
+
+      {/* Student Profile Preview Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-md w-full overflow-hidden shadow-modal">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#0A2540]">Candidate Profile</h3>
+              <button onClick={() => setSelectedStudent(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-[#0F4C81] text-white flex items-center justify-center text-lg font-bold">
+                  {selectedStudent.fullName.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-[#0A2540]">{selectedStudent.fullName}</h4>
+                  <div className="text-xs font-mono text-slate-500">
+                    {selectedStudent.usn} • {selectedStudent.branch} • Sem {selectedStudent.semester}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed pt-2 border-t border-slate-100">
+                Skills: Python, PyTorch, Scikit-Learn, Fastify, Docker, Network Flow Analysis.
+              </p>
+            </div>
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setSelectedStudent(null)}
+                className="h-8 px-4 rounded-lg bg-[#1D63ED] text-white text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

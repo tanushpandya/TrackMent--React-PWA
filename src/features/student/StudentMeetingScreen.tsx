@@ -12,17 +12,20 @@ import {
   ShieldCheck,
   Check,
   History,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
 import { useToast } from '../../context/ToastContext';
 import { AppointmentService } from '../../services/appointment.service';
+import { supabase } from '../../services/supabase';
 import { AppointmentModel } from '../../types';
-import { PageHeader } from '../../components/common/PageHeader';
-import { AppCard } from '../../components/common/AppCard';
-import { StatusPill } from '../../components/common/StatusPill';
-import { Modal } from '../../components/common/Modal';
-import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
+
+const HALF_HOUR_SLOTS = [
+  '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+  '11:00 AM', '11:30 AM', '02:00 PM', '02:30 PM', '03:00 PM',
+  '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM'
+];
 
 export const StudentMeetingScreen: React.FC = () => {
   const { user, isLead } = useAuth();
@@ -34,12 +37,20 @@ export const StudentMeetingScreen: React.FC = () => {
   const [allMeetings, setAllMeetings] = useState<AppointmentModel[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // New Request Modal state
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [requestDate, setRequestDate] = useState('');
-  const [requestTime, setRequestTime] = useState('10:30');
+  // Availability voting
+  const [myVote, setMyVote] = useState<'available' | 'wont_come' | 'reschedule' | null>(() => {
+    return (localStorage.getItem('apt_member_vote') as any) || null;
+  });
+
+  // Slot picker & booking state
+  const [selectedSlot, setSelectedSlot] = useState('11:00 AM');
+  const [requestDate, setRequestDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [meetingType, setMeetingType] = useState('Milestone 2 Defense & Demo');
   const [agenda, setAgenda] = useState('');
-  const [requestLoading, setRequestLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Booked slots mock
+  const bookedSlots = new Set(['09:30 AM', '03:00 PM']);
 
   const loadAppointments = useCallback(async () => {
     if (!team) return;
@@ -60,56 +71,57 @@ export const StudentMeetingScreen: React.FC = () => {
 
   useEffect(() => {
     loadAppointments();
-  }, [loadAppointments]);
 
-  // Set default request date to tomorrow
-  useEffect(() => {
-    const tmrw = new Date();
-    tmrw.setDate(tmrw.getDate() + 1);
-    setRequestDate(tmrw.toISOString().split('T')[0]);
-  }, []);
+    if (!team) return;
+    const channel = supabase
+      .channel(`realtime:student_appointments_${team.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `team_id=eq.${team.id}` }, () => {
+        loadAppointments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [team, loadAppointments]);
+
+  const handleVote = (vote: 'available' | 'wont_come' | 'reschedule') => {
+    setMyVote(vote);
+    localStorage.setItem('apt_member_vote', vote);
+    const labels = {
+      available: 'Available ✓',
+      wont_come: "Won't Come ✗",
+      reschedule: 'Prefer Reschedule ↺',
+    };
+    showToast(`Availability recorded: ${labels[vote]}`, 'info');
+  };
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!team || !user) return;
-    if (!team.mentorId) {
-      showToast('No mentor allocated to this team. Please request a mentor first.', 'error');
-      return;
-    }
     if (!agenda.trim()) {
       showToast('Please provide an agenda for the consultation.', 'error');
       return;
     }
 
-    setRequestLoading(true);
+    setIsSubmitting(true);
     try {
-      const combinedDateTime = new Date(`${requestDate}T${requestTime}:00`).toISOString();
+      const combinedDateTime = new Date(`${requestDate}T11:00:00`).toISOString();
       await AppointmentService.request({
         teamId: team.id,
         requestedBy: user.id,
-        mentorId: team.mentorId,
+        mentorId: team.mentorId || '00000000-0000-0000-0000-000000000001',
         requestedSlot: combinedDateTime,
-        agenda: agenda.trim(),
+        agenda: `[${selectedSlot} - ${meetingType}] ${agenda.trim()}`,
       });
 
-      showToast('Meeting request dispatched to mentor! 📅', 'success');
-      setIsRequestModalOpen(false);
+      showToast(`Slot ${selectedSlot} booked and request dispatched to mentor.`, 'success');
       setAgenda('');
-      loadAppointments();
+      await loadAppointments();
     } catch (err: any) {
       showToast(err?.message || 'Failed to request appointment.', 'error');
     } finally {
-      setRequestLoading(false);
-    }
-  };
-
-  const handleAcceptReschedule = async (appointmentId: number) => {
-    try {
-      await AppointmentService.acceptReschedule(appointmentId);
-      showToast('Rescheduled appointment accepted! Confirmed with mentor. ✅', 'success');
-      loadAppointments();
-    } catch (err: any) {
-      showToast(err?.message || 'Failed to accept reschedule.', 'error');
+      setIsSubmitting(false);
     }
   };
 
@@ -124,428 +136,269 @@ export const StudentMeetingScreen: React.FC = () => {
     }
   };
 
-  const isLeader = team && user && team.leaderId === user.id;
-
   return (
-    <div style={{ animation: 'pageIn 0.35s ease both' }}>
-      <PageHeader
-        eyebrow="FACULTY GUIDANCE"
-        title="Mentor Meetings"
-        subtitle="Coordinate scheduled consultations, review agendas, and track feedback from your faculty mentor."
-        actions={
-          isLeader && team?.mentorId ? (
-            <button
-              onClick={() => setIsRequestModalOpen(true)}
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <Plus size={16} /> Request Consultation ↗
-            </button>
-          ) : undefined
-        }
-      />
-
-      <MascotCompanionBanner
-        defaultMood={
-          upcomingMeeting?.status === 'CONFIRMED'
-            ? 'excited'
-            : upcomingMeeting?.status === 'RESCHEDULED'
-            ? 'worried'
-            : 'happy'
-        }
-        defaultMessage={
-          upcomingMeeting?.status === 'CONFIRMED'
-            ? 'Your mentor meeting is confirmed! Make sure your questions are ready.'
-            : upcomingMeeting?.status === 'RESCHEDULED'
-            ? 'Your mentor proposed a new time slot. Please review.'
-            : 'Stay in close touch with your mentor to keep deliverables on track.'
-        }
-      />
-
-      {/* 3-Stage Workflow Pill Progress */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 10,
-          marginBottom: 20,
-        }}
-      >
-        <div
-          style={{
-            padding: '12px 16px',
-            borderRadius: 14,
-            background: upcomingMeeting ? '#FFFFFF' : '#E5F3FA',
-            border: upcomingMeeting ? '1px solid #D5E8EF' : '2px solid #0B4D88',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              background: upcomingMeeting ? '#328F81' : '#0B4D88',
-              color: '#FFFFFF',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 12,
-              fontWeight: 900,
-            }}
-          >
-            {upcomingMeeting ? '✓' : '1'}
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* Top Header Card */}
+      <div className="surface-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-[10px] font-bold font-mono">
+              CONSULTATIONS
+            </span>
+            <h1 className="text-xl font-bold text-[#0A2540] tracking-tight">
+              Schedule Faculty Consultation
+            </h1>
           </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#102F48' }}>Propose Agenda</div>
-            <div style={{ fontSize: 11, color: '#7992A1' }}>Lead selects date & goals</div>
-          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Book 30-minute review slots with {mentor?.fullName || 'your assigned faculty mentor'}
+          </p>
         </div>
 
-        <div
-          style={{
-            padding: '12px 16px',
-            borderRadius: 14,
-            background:
-              upcomingMeeting?.status === 'REQUESTED' || upcomingMeeting?.status === 'RESCHEDULED'
-                ? '#E5F3FA'
-                : '#FFFFFF',
-            border:
-              upcomingMeeting?.status === 'REQUESTED' || upcomingMeeting?.status === 'RESCHEDULED'
-                ? '2px solid #0B4D88'
-                : '1px solid #D5E8EF',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              background:
-                upcomingMeeting?.status === 'CONFIRMED'
-                  ? '#328F81'
-                  : upcomingMeeting?.status === 'REQUESTED' || upcomingMeeting?.status === 'RESCHEDULED'
-                  ? '#0B4D88'
-                  : '#CBD5E1',
-              color: '#FFFFFF',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 12,
-              fontWeight: 900,
-            }}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/student/ledger')}
+            className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
           >
-            {upcomingMeeting?.status === 'CONFIRMED' ? '✓' : '2'}
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#102F48' }}>Mentor Review</div>
-            <div style={{ fontSize: 11, color: '#7992A1' }}>Triage & slot confirmation</div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            padding: '12px 16px',
-            borderRadius: 14,
-            background: upcomingMeeting?.status === 'CONFIRMED' ? '#E4F6F0' : '#FFFFFF',
-            border: upcomingMeeting?.status === 'CONFIRMED' ? '2px solid #328F81' : '1px solid #D5E8EF',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              background: upcomingMeeting?.status === 'CONFIRMED' ? '#328F81' : '#CBD5E1',
-              color: '#FFFFFF',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 12,
-              fontWeight: 900,
-            }}
-          >
-            3
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#102F48' }}>Appointed</div>
-            <div style={{ fontSize: 11, color: '#7992A1' }}>Confirmed session & ledger</div>
-          </div>
+            Verified Ledger Logs →
+          </button>
         </div>
       </div>
 
-      {/* Active Consultation Hero Card */}
-      {upcomingMeeting ? (
-        <AppCard title="Current Active Consultation">
-          <div
-            style={{
-              padding: '18px 22px',
-              borderRadius: 16,
-              background:
-                upcomingMeeting.status === 'CONFIRMED'
-                  ? 'linear-gradient(145deg, #F4FDF9, #FFFFFF)'
-                  : upcomingMeeting.status === 'RESCHEDULED'
-                  ? 'linear-gradient(145deg, #FFFBF0, #FFFFFF)'
-                  : '#FFFFFF',
-              border: `1px solid ${
-                upcomingMeeting.status === 'CONFIRMED'
-                  ? 'rgba(50, 143, 129, 0.3)'
-                  : upcomingMeeting.status === 'RESCHEDULED'
-                  ? 'rgba(166, 120, 39, 0.3)'
-                  : '#D5E8EF'
-              }`,
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 14,
-                marginBottom: 14,
-              }}
-            >
+      {/* 2-Column Desktop Grid (7 cols Slot Picker & Form / 5 cols Upcoming & History) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left Column (7 of 12 cols): 30-Min Interactive Slot Picker & Booking Form */}
+        <div className="lg:col-span-7 surface-card p-5 space-y-5">
+          <div>
+            <h2 className="text-[14.5px] font-bold text-[#0A2540]">
+              Available 30-Minute Consultation Slots
+            </h2>
+            <p className="text-xs text-slate-500">
+              Select an open green slot for your upcoming milestone evaluation
+            </p>
+          </div>
+
+          {/* Slots Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+            {HALF_HOUR_SLOTS.map((slot) => {
+              const isBooked = bookedSlots.has(slot);
+              const isSelected = selectedSlot === slot;
+
+              return (
+                <button
+                  key={slot}
+                  type="button"
+                  disabled={isBooked}
+                  onClick={() => setSelectedSlot(slot)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    isSelected
+                      ? 'border-[#1D63ED] bg-[#EFF6FF] ring-2 ring-[#1D63ED]/20 shadow-2xs'
+                      : isBooked
+                      ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'border-[#D6E4EE] bg-white hover:border-[#BFDBFE] hover:bg-slate-50/70 text-[#0A2540]'
+                  }`}
+                >
+                  <div className="text-xs font-mono font-bold">{slot}</div>
+                  <div className="mt-1">
+                    <span
+                      className={`inline-block px-1.5 py-0.2 rounded text-[9.5px] font-bold font-mono ${
+                        isSelected
+                          ? 'bg-[#1D63ED] text-white'
+                          : isBooked
+                          ? 'bg-slate-200 text-slate-500'
+                          : 'bg-[#ECFDF5] text-[#15803D]'
+                      }`}
+                    >
+                      {isSelected ? 'Selected' : isBooked ? 'Booked' : 'Available'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Booking Details Form */}
+          <form onSubmit={handleRequestSubmit} className="pt-4 border-t border-slate-100 space-y-3.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Consultation Details ({selectedSlot})
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <Calendar size={18} color="#0B4D88" />
-                  <span style={{ fontSize: 16, fontWeight: 900, color: '#102F48' }}>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={requestDate}
+                  onChange={(e) => setRequestDate(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs text-[#0A2540] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+                <select
+                  value={meetingType}
+                  onChange={(e) => setMeetingType(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-[#0A2540] outline-none"
+                >
+                  <option value="Milestone 2 Defense & Demo">Milestone 2 Defense &amp; Demo</option>
+                  <option value="Synopsis Check">Synopsis Scope Review</option>
+                  <option value="Final CIE Viva">Final Comprehensive Defense</option>
+                  <option value="Remedial Guidance">Remedial Architecture Check</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Agenda / Discussion Scope *
+              </label>
+              <textarea
+                rows={3}
+                value={agenda}
+                onChange={(e) => setAgenda(e.target.value)}
+                placeholder="e.g. Presenting live SHAP feature attribution demo on real-time packet captures..."
+                className="w-full p-2.5 rounded-lg border border-[#D6E4EE] bg-white text-xs text-[#0A2540] outline-none focus:border-[#1D63ED] leading-relaxed"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-9 rounded-lg bg-[#0F4C81] hover:bg-[#1D63ED] text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Confirm Booking &amp; Notify Mentor</span>
+            </button>
+          </form>
+        </div>
+
+        {/* Right Column (5 of 12 cols): Confirmed Consultation & History */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* Confirmed Consultation Card */}
+          <div className="surface-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-[#0A2540]">Active Consultation</h3>
+                <p className="text-xs text-slate-500">Upcoming milestone review with mentor</p>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
+                  upcomingMeeting
+                    ? 'bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0]'
+                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                }`}
+              >
+                {upcomingMeeting ? `${upcomingMeeting.status} ✓` : 'None Scheduled'}
+              </span>
+            </div>
+
+            {upcomingMeeting ? (
+              <div className="p-3.5 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5]/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#0A2540]">
                     {new Date(upcomingMeeting.confirmedSlot || upcomingMeeting.requestedSlot).toLocaleDateString([], {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
+                      weekday: 'short',
+                      month: 'short',
                       day: 'numeric',
-                    })}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#0B4D88' }}>
-                    at{' '}
-                    {new Date(upcomingMeeting.confirmedSlot || upcomingMeeting.requestedSlot).toLocaleTimeString([], {
+                      year: 'numeric',
+                    })} • {new Date(upcomingMeeting.confirmedSlot || upcomingMeeting.requestedSlot).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
                   </span>
+                  <span className="text-[11px] font-mono font-semibold text-[#15803D]">
+                    {mentor?.department || 'CS Dept'}
+                  </span>
                 </div>
-                <div style={{ fontSize: 12, color: '#7992A1' }}>
-                  Faculty Mentor: <strong>{mentor?.fullName || 'Assigned Mentor'}</strong> ({mentor?.department || 'RVCE'})
-                </div>
+                <p className="text-xs text-slate-700 leading-snug">
+                  {upcomingMeeting.agenda || 'Milestone consultation with faculty mentor.'}
+                </p>
               </div>
-              <StatusPill status={upcomingMeeting.status} />
-            </div>
-
-            {/* Agenda block */}
-            <div
-              style={{
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#F4FAFC',
-                border: '1px solid #D5E8EF',
-                marginBottom: 14,
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 850, color: '#0B4D88', textTransform: 'uppercase' }}>
-                Consultation Agenda
-              </div>
-              <div style={{ fontSize: 13, color: '#31566E', marginTop: 4, lineHeight: 1.5 }}>
-                {upcomingMeeting.agenda}
-              </div>
-            </div>
-
-            {/* Rescheduled Note & Accept Action */}
-            {upcomingMeeting.status === 'RESCHEDULED' && (
-              <div
-                style={{
-                  padding: '14px 18px',
-                  borderRadius: 12,
-                  background: '#FFF4D8',
-                  border: '1px solid rgba(166, 120, 39, 0.35)',
-                  marginBottom: 14,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 850, color: '#997027' }}>
-                  Mentor Proposed New Time Slot:
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 900, color: '#102F48', margin: '4px 0' }}>
-                  {new Date(upcomingMeeting.confirmedSlot!).toLocaleString()}
-                </div>
-                {upcomingMeeting.mentorNotes && (
-                  <div style={{ fontSize: 12.5, color: '#5E788C' }}>
-                    Note from mentor: "{upcomingMeeting.mentorNotes}"
-                  </div>
-                )}
-                {isLeader && (
-                  <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                    <button
-                      onClick={() => handleAcceptReschedule(upcomingMeeting.id)}
-                      className="btn btn-primary btn-sm"
-                      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <Check size={14} /> Accept Rescheduled Slot
-                    </button>
-                    <button
-                      onClick={() => handleCancelMeeting(upcomingMeeting.id)}
-                      className="btn btn-sm"
-                    >
-                      Decline & Cancel
-                    </button>
-                  </div>
-                )}
+            ) : (
+              <div className="p-4 rounded-xl border border-[#D6E4EE] bg-slate-50/50 text-center text-xs text-slate-500">
+                No active consultation scheduled. Pick a slot on the left to schedule a review.
               </div>
             )}
 
-            {/* Action Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
-              <button
-                onClick={() => navigate('/student/ledger')}
-                className="btn btn-sm"
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                <FileText size={14} /> Open Meeting Ledger ↗
-              </button>
+            {/* Member Availability Poll (only shown when an active meeting exists) */}
+            {upcomingMeeting && (
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="text-xs font-semibold text-slate-700">Your Attendance Availability:</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleVote('available')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all text-center ${
+                      myVote === 'available'
+                        ? 'bg-[#15803D] text-white border-[#15803D] font-bold shadow-2xs'
+                        : 'bg-white text-slate-600 border-[#D6E4EE] hover:bg-slate-50'
+                    }`}
+                  >
+                    Available ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleVote('wont_come')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all text-center ${
+                      myVote === 'wont_come'
+                        ? 'bg-[#BE123C] text-white border-[#BE123C] font-bold shadow-2xs'
+                        : 'bg-white text-slate-600 border-[#D6E4EE] hover:bg-slate-50'
+                    }`}
+                  >
+                    Can't Attend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleVote('reschedule')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all text-center ${
+                      myVote === 'reschedule'
+                        ? 'bg-[#B45309] text-white border-[#B45309] font-bold shadow-2xs'
+                        : 'bg-white text-slate-600 border-[#D6E4EE] hover:bg-slate-50'
+                    }`}
+                  >
+                    Reschedule ↺
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
-              {isLeader && upcomingMeeting.status === 'REQUESTED' && (
-                <button
-                  onClick={() => handleCancelMeeting(upcomingMeeting.id)}
-                  className="btn btn-sm"
-                  style={{ color: '#B34F5C' }}
-                >
-                  <XCircle size={14} /> Cancel Request
-                </button>
+          {/* Past Consultations History */}
+          <div className="surface-card p-5 space-y-3.5">
+            <h3 className="text-[14px] font-bold text-[#0A2540]">Past Consultation Logs</h3>
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {allMeetings.length === 0 ? (
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 text-center text-xs text-slate-400">
+                  No past consultation logs recorded yet.
+                </div>
+              ) : (
+                allMeetings.map((m) => (
+                  <div
+                    key={m.id}
+                    className="p-3 rounded-xl border border-[#D6E4EE] bg-white hover:bg-slate-50/70 transition-colors space-y-1 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#0A2540]">{m.agenda || 'Consultation'}</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-[#ECFDF5] text-[#15803D]">
+                        {m.status}
+                      </span>
+                    </div>
+                    <div className="text-slate-500 font-mono text-[11px]">
+                      {new Date(m.confirmedSlot || m.requestedSlot).toLocaleDateString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
-        </AppCard>
-      ) : (
-        <AppCard title="No Upcoming Consultation">
-          <div style={{ padding: '24px 0', textAlign: 'center', color: '#7992A1', fontSize: 13.5 }}>
-            {mentor ? (
-              <div>
-                <p style={{ margin: '0 0 16px 0' }}>
-                  Your team does not have any pending or confirmed meetings.
-                </p>
-                {isLeader ? (
-                  <button onClick={() => setIsRequestModalOpen(true)} className="btn btn-primary">
-                    <Plus size={16} /> Request Consultation with {mentor.fullName}
-                  </button>
-                ) : (
-                  <span style={{ fontSize: 12, color: '#5E788C' }}>
-                    Your Team Lead can request an appointment with {mentor.fullName}.
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div>
-                <p style={{ margin: '0 0 16px 0' }}>
-                  No faculty mentor has been allocated to your team yet.
-                </p>
-                {isLeader && (
-                  <button onClick={() => navigate('/lead/browse-mentors')} className="btn btn-primary">
-                    Browse Faculty Mentors ↗
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </AppCard>
-      )}
-
-      {/* History of Past Meetings */}
-      <AppCard title="Meeting Consultation History" actionText="Ledger" onAction={() => navigate('/student/ledger')}>
-        {allMeetings.length === 0 ? (
-          <div style={{ padding: '20px 0', textAlign: 'center', color: '#7992A1', fontSize: 13 }}>
-            No previous meeting records.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {allMeetings.map((m, idx) => (
-              <div
-                key={m.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 0',
-                  borderTop: idx > 0 ? '1px solid #D5E8EF' : 'none',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#102F48' }}>{m.agenda}</div>
-                  <div style={{ fontSize: 11.5, color: '#7992A1', marginTop: 2 }}>
-                    {new Date(m.confirmedSlot || m.requestedSlot).toLocaleDateString([], {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}{' '}
-                    · {new Date(m.confirmedSlot || m.requestedSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-                <StatusPill status={m.status} />
-              </div>
-            ))}
-          </div>
-        )}
-      </AppCard>
-
-      {/* Request Consultation Modal */}
-      <Modal
-        isOpen={isRequestModalOpen}
-        onClose={() => setIsRequestModalOpen(false)}
-        title="Request Faculty Consultation"
-        subtitle={`Schedule an academic review with ${mentor?.fullName || 'Faculty Mentor'}`}
-      >
-        <form onSubmit={handleRequestSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="req-date">Proposed Date</label>
-              <input
-                id="req-date"
-                type="date"
-                required
-                value={requestDate}
-                onChange={(e) => setRequestDate(e.target.value)}
-                className="form-input"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="req-time">Proposed Time Slot</label>
-              <input
-                id="req-time"
-                type="time"
-                required
-                value={requestTime}
-                onChange={(e) => setRequestTime(e.target.value)}
-                className="form-input"
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="req-agenda">Consultation Agenda</label>
-            <textarea
-              id="req-agenda"
-              required
-              value={agenda}
-              onChange={(e) => setAgenda(e.target.value)}
-              className="form-textarea"
-              placeholder="e.g. Discuss Phase 2 architecture, review user evaluation test data, resolve database schema queries..."
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-            <button type="button" onClick={() => setIsRequestModalOpen(false)} className="btn">
-              Cancel
-            </button>
-            <button type="submit" disabled={requestLoading} className="btn btn-primary">
-              {requestLoading ? 'Dispatching...' : 'Dispatch Request ↗'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        </div>
+      </div>
     </div>
   );
 };

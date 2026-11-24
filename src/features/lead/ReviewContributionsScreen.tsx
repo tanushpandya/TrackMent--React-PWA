@@ -1,16 +1,24 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { CheckCircle, XCircle, FileText, ExternalLink, Download, Check, AlertCircle, ArrowLeft } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  FileText,
+  ExternalLink,
+  Download,
+  Check,
+  AlertCircle,
+  ArrowLeft,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
 import { useToast } from '../../context/ToastContext';
 import { ContributionService } from '../../services/contribution.service';
 import { StorageService } from '../../services/storage.service';
+import { supabase } from '../../services/supabase';
 import { ContributionModel } from '../../types';
-import { PageHeader } from '../../components/common/PageHeader';
-import { AppCard } from '../../components/common/AppCard';
-import { StatusPill } from '../../components/common/StatusPill';
-import { Modal } from '../../components/common/Modal';
 
 export const ReviewContributionsScreen: React.FC = () => {
   const { user } = useAuth();
@@ -32,7 +40,7 @@ export const ReviewContributionsScreen: React.FC = () => {
     try {
       setLoading(true);
       const data = await ContributionService.fetchPendingForTeam(team.id);
-      // Lead can review other members' contributions (own contributions are democratically voted)
+      // Lead can review other members' contributions
       setPendingList(data.filter((c) => c.authorId !== user?.id));
     } catch (e) {
       console.error('Error loading pending review contributions:', e);
@@ -43,7 +51,19 @@ export const ReviewContributionsScreen: React.FC = () => {
 
   useEffect(() => {
     loadPending();
-  }, [loadPending]);
+
+    if (!team) return;
+    const channel = supabase
+      .channel(`realtime:lead_reviews_${team.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contributions', filter: `team_id=eq.${team.id}` }, () => {
+        loadPending();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [team, loadPending]);
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +84,7 @@ export const ReviewContributionsScreen: React.FC = () => {
 
       showToast(
         verdict === 'CONFIRMED'
-          ? 'Deliverable accepted and verified! 🎉'
+          ? 'Deliverable accepted and verified.'
           : 'Update request submitted to teammate.',
         'success'
       );
@@ -78,223 +98,160 @@ export const ReviewContributionsScreen: React.FC = () => {
     }
   };
 
-  const handleDownloadProof = async (path: string) => {
-    try {
-      showToast('Generating secure download URL...', 'info');
-      const url = await StorageService.getSignedUrl(path);
-      window.open(url, '_blank');
-    } catch (err: any) {
-      showToast(err?.message || 'Could not download file', 'error');
-    }
-  };
-
   return (
-    <div style={{ animation: 'pageIn 0.35s ease both' }}>
-      <PageHeader
-        eyebrow="PEER QUALITY ASSURANCE"
-        title="Review Contributions"
-        subtitle="Examine submitted proof artifacts, verify code and documentation, and recognize peer contributions."
-        actions={
-          <button onClick={() => navigate(-1)} className="btn btn-sm">
-            <ArrowLeft size={14} /> Back
-          </button>
-        }
-      />
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* Top Header Card */}
+      <div className="surface-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] text-[10px] font-bold font-mono">
+              QA REVIEW
+            </span>
+            <h1 className="text-xl font-bold text-[#0A2540] tracking-tight">
+              Peer Review Submissions
+            </h1>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Examine submitted proof artifacts, verify code and documentation, and recognize peer contributions.
+          </p>
+        </div>
 
-      <AppCard title={`Awaiting Your Review (${pendingList.length})`}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/student/dashboard')}
+            className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+      </div>
+
+      {/* Review Queue Feed */}
+      <div className="surface-card p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h2 className="text-[14.5px] font-bold text-[#0A2540]">
+            Awaiting Review ({pendingList.length})
+          </h2>
+          <span className="text-xs font-mono font-bold text-slate-400">Team Quality Assurance</span>
+        </div>
+
         {loading ? (
-          <div style={{ padding: '30px 0', textAlign: 'center', color: '#7992A1' }}>
-            Loading deliverables...
+          <div className="py-16 text-center text-slate-500 space-y-2">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#1D63ED]" />
+            <div className="text-sm">Loading submissions queue...</div>
           </div>
         ) : pendingList.length === 0 ? (
-          <div style={{ padding: '36px 0', textAlign: 'center', color: '#7992A1', fontSize: 13.5 }}>
-            No pending submissions waiting for review! All peer work is up to date. ✨
+          <div className="py-14 text-center space-y-2">
+            <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
+            <p className="text-sm font-semibold text-[#0A2540]">All peer deliverables reviewed!</p>
+            <p className="text-xs text-slate-500">
+              No pending student submissions waiting for verification right now.
+            </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="space-y-3">
             {pendingList.map((c) => (
               <div
                 key={c.id}
-                style={{
-                  padding: '18px 20px',
-                  borderRadius: 14,
-                  border: '1px solid #D5E8EF',
-                  background: '#FFFFFF',
-                  boxShadow: '0 4px 12px rgba(12, 64, 101, 0.05)',
-                }}
+                className="p-4 rounded-xl border border-[#D6E4EE] bg-white hover:border-[#BFDBFE] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: 12,
-                    marginBottom: 8,
-                  }}
-                >
-                  <div>
-                    <h3 style={{ fontSize: 16, fontWeight: 850, color: '#102F48', margin: 0 }}>
-                      {c.title}
-                    </h3>
-                    <div style={{ fontSize: 12, color: '#7992A1', marginTop: 3 }}>
-                      Submitted by <strong>{c.authorName || 'Teammate'}</strong> ·{' '}
-                      {c.createdAt
-                        ? new Date(c.createdAt).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                          })
-                        : 'Recently'}
-                    </div>
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-[14px] text-[#0A2540]">{c.title}</span>
+                    <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-[10.5px] font-bold font-mono">
+                      {c.contributionType || 'Module'}
+                    </span>
                   </div>
+                  <div className="text-xs text-slate-500 font-mono">
+                    By <strong className="text-slate-700">{c.authorName || 'Teammate'}</strong> •{' '}
+                    {new Date(c.createdAt || Date.now()).toLocaleDateString()}
+                  </div>
+                  {c.description && (
+                    <p className="text-xs text-slate-600 line-clamp-2 mt-1">{c.description}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => {
                       setSelectedContrib(c);
                       setVerdict('CONFIRMED');
-                      setReason('');
                     }}
-                    className="btn btn-primary btn-sm"
+                    className="h-8 px-3.5 rounded-lg bg-[#15803D] hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors"
                   >
-                    Open Review ↗
+                    Verify &amp; Accept ✓
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedContrib(c);
+                      setVerdict('REJECTED');
+                    }}
+                    className="h-8 px-3 rounded-lg border border-[#FECDD3] bg-white hover:bg-[#FFF1F2] text-[#BE123C] text-xs font-semibold transition-colors"
+                  >
+                    Request Updates
                   </button>
                 </div>
-
-                <p style={{ fontSize: 13, color: '#31566E', lineHeight: 1.5, margin: '10px 0' }}>
-                  {c.description}
-                </p>
-
-                {/* External Links */}
-                {c.links && c.links.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                    {c.links.map((link, idx) => (
-                      <a
-                        key={idx}
-                        href={link}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 5,
-                          padding: '4px 10px',
-                          borderRadius: 8,
-                          background: '#E5F3FA',
-                          color: '#0B4D88',
-                          fontSize: 11.5,
-                          fontWeight: 750,
-                          textDecoration: 'none',
-                        }}
-                      >
-                        <ExternalLink size={12} /> {link}
-                      </a>
-                    ))}
-                  </div>
-                )}
-
-                {/* Attached Files */}
-                {c.files && c.files.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-                    {c.files.map((f) => (
-                      <button
-                        key={f.id}
-                        onClick={() => handleDownloadProof(f.storagePath)}
-                        className="btn btn-sm"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#F4FAFC' }}
-                      >
-                        <FileText size={14} color="#0B4D88" />
-                        <span>{f.fileName}</span>
-                        <Download size={13} color="#5E788C" />
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </div>
         )}
-      </AppCard>
+      </div>
 
-      {/* Review Modal */}
-      <Modal
-        isOpen={Boolean(selectedContrib)}
-        onClose={() => setSelectedContrib(null)}
-        title="Review Deliverable"
-        subtitle={`Reviewing "${selectedContrib?.title || 'Work'}" by ${selectedContrib?.authorName || 'Teammate'}`}
-        maxWidth={560}
-      >
-        <form onSubmit={handleReviewSubmit}>
-          <div className="form-group">
-            <label className="form-label">Review Verdict</label>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setVerdict('CONFIRMED')}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: 12,
-                  border: verdict === 'CONFIRMED' ? '2px solid #328F81' : '1px solid #D5E8EF',
-                  background: verdict === 'CONFIRMED' ? '#E4F6F0' : '#FFFFFF',
-                  color: verdict === 'CONFIRMED' ? '#328F81' : '#5E788C',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-              >
-                <CheckCircle size={16} /> Accept & Verify
-              </button>
-              <button
-                type="button"
-                onClick={() => setVerdict('REJECTED')}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: 12,
-                  border: verdict === 'REJECTED' ? '2px solid #B34F5C' : '1px solid #D5E8EF',
-                  background: verdict === 'REJECTED' ? '#FBECEB' : '#FFFFFF',
-                  color: verdict === 'REJECTED' ? '#B34F5C' : '#5E788C',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-              >
-                <XCircle size={16} /> Request Updates
-              </button>
+      {/* Review Confirmation Modal */}
+      {selectedContrib && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-md w-full overflow-hidden shadow-modal">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#0A2540]">
+                {verdict === 'CONFIRMED' ? 'Verify Deliverable' : 'Request Deliverable Updates'}
+              </h3>
+              <button onClick={() => setSelectedContrib(null)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
-          </div>
+            <form onSubmit={handleReviewSubmit} className="p-5 space-y-3">
+              <div>
+                <div className="text-xs font-bold text-[#0A2540]">{selectedContrib.title}</div>
+                <div className="text-[11px] text-slate-500 font-mono">By {selectedContrib.authorName}</div>
+              </div>
 
-          {verdict === 'REJECTED' && (
-            <div className="form-group">
-              <label className="form-label" htmlFor="feedback-reason">
-                Feedback & Required Updates (Required)
-              </label>
-              <textarea
-                id="feedback-reason"
-                required
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="form-textarea"
-                placeholder="Give constructive guidance on what needs to be added, fixed, or tested before acceptance..."
-              />
-            </div>
-          )}
+              {verdict === 'REJECTED' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Feedback / Revision Notes *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Specify necessary changes before accepting..."
+                    className="w-full p-2.5 rounded-lg border border-[#D6E4EE] text-xs text-[#0A2540] outline-none focus:border-[#1D63ED]"
+                  />
+                </div>
+              )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
-            <button type="button" onClick={() => setSelectedContrib(null)} className="btn">
-              Cancel
-            </button>
-            <button type="submit" disabled={submitting} className="btn btn-primary">
-              {submitting ? 'Submitting...' : 'Submit Review ↗'}
-            </button>
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedContrib(null)}
+                  className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className={`h-8 px-4 rounded-lg text-white text-xs font-semibold transition-colors disabled:opacity-50 ${
+                    verdict === 'CONFIRMED'
+                      ? 'bg-[#15803D] hover:bg-emerald-800'
+                      : 'bg-[#BE123C] hover:bg-rose-700'
+                  }`}
+                >
+                  {submitting ? 'Submitting...' : verdict === 'CONFIRMED' ? 'Confirm Acceptance' : 'Send Revision Request'}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 };

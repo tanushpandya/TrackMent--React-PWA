@@ -149,7 +149,7 @@ export const StudentAcademicMarksCard: React.FC<StudentAcademicMarksCardProps> =
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 850, color: '#102F48' }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#102F48' }}>
                         {ev.phaseName}
                       </span>
                       <span className="badge badge-confirmed">

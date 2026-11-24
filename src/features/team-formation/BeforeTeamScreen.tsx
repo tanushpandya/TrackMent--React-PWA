@@ -33,13 +33,9 @@ export const BeforeTeamScreen: React.FC = () => {
   // If user already has a team, route to dashboard immediately
   useEffect(() => {
     if (team) {
-      if (user?.role === 'TEAM_LEAD') {
-        navigate('/lead/dashboard', { replace: true });
-      } else {
-        navigate('/student/dashboard', { replace: true });
-      }
+      navigate('/student/dashboard', { replace: true });
     }
-  }, [team, user, navigate]);
+  }, [team, navigate]);
 
   const loadInvitations = useCallback(async () => {
     if (!user) return;

@@ -69,7 +69,7 @@ export const FacultyProfileScreen: React.FC = () => {
       }
 
       await refreshProfile();
-      showToast('Faculty profile verified and saved! 🎓', 'success');
+      showToast('Faculty profile verified and saved.', 'success');
       navigate('/mentor/dashboard');
     } catch (err: any) {
       const msg = err?.message || '';

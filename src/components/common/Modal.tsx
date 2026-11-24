@@ -7,6 +7,7 @@ interface ModalProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   maxWidth?: number;
 }
 
@@ -16,6 +17,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   subtitle,
   children,
+  footer,
   maxWidth = 520,
 }) => {
   const modalRef = React.useRef<HTMLDivElement>(null);
@@ -61,8 +63,9 @@ export const Modal: React.FC<ModalProps> = ({
     const timer = setTimeout(() => {
       if (modalRef.current) {
         const focusable =
-          modalRef.current.querySelector<HTMLElement>('input, textarea, select, button:not([aria-label="Close dialog"])') ||
-          modalRef.current.querySelector<HTMLElement>('button');
+          modalRef.current.querySelector<HTMLElement>(
+            'input, textarea, select, button:not([aria-label="Close dialog"])'
+          ) || modalRef.current.querySelector<HTMLElement>('button');
         if (focusable) focusable.focus();
       }
     }, 50);
@@ -81,18 +84,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        backgroundColor: 'rgba(10, 47, 72, 0.45)',
-        backdropFilter: 'blur(8px)',
-        animation: 'pageIn 0.2s ease both',
-      }}
+      className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#0A2540]/45 backdrop-blur-[4px] animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -102,94 +94,43 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        style={{
-          width: '100%',
-          maxWidth,
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'linear-gradient(145deg, #ffffff, #f4fafb)',
-          borderRadius: 22,
-          border: '1px solid rgba(255, 255, 255, 0.95)',
-          boxShadow: '0 24px 60px rgba(10, 48, 77, 0.28)',
-          overflow: 'hidden',
-          animation: 'pageIn 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both',
-        }}
+        style={{ maxWidth }}
+        className="w-full max-h-[90vh] flex flex-col bg-white rounded-xl border border-[#D6E4EE] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
-        {/* Modal Top Bar Accent */}
-        <div
-          style={{
-            height: 4,
-            background: 'linear-gradient(90deg, #07518d 0%, #087aa9 38%, #28bdca 72%, rgba(40, 189, 202, 0) 100%)',
-          }}
-        />
-
         {/* Modal Header */}
-        <div
-          style={{
-            padding: '18px 22px 14px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            borderBottom: '1px solid #D5E8EF',
-          }}
-        >
-          <div>
-            <h3
-              id="modal-title"
-              style={{
-                fontSize: 17,
-                fontWeight: 850,
-                color: '#102F48',
-                margin: 0,
-              }}
-            >
+        <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-slate-100">
+          <div className="min-w-0">
+            <h3 id="modal-title" className="text-[15.5px] font-bold text-[#0A2540] leading-snug">
               {title}
             </h3>
             {subtitle && (
-              <p
-                style={{
-                  fontSize: 12,
-                  color: '#5E788C',
-                  marginTop: 3,
-                  margin: 0,
-                }}
-              >
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                 {subtitle}
               </p>
             )}
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 10,
-              border: '1px solid #D5E8EF',
-              background: '#FFFFFF',
-              display: 'grid',
-              placeItems: 'center',
-              color: '#5E788C',
-              cursor: 'pointer',
-              transition: 'background 0.15s ease',
-            }}
+            className="w-8 h-8 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-[#0A2540] transition-colors shrink-0"
           >
-            <X size={17} />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div
-          style={{
-            padding: '20px 22px',
-            overflowY: 'auto',
-            flex: 1,
-          }}
-        >
+        <div className="px-5 py-4 overflow-y-auto flex-1">
           {children}
         </div>
+
+        {/* Optional Modal Footer */}
+        {footer && (
+          <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/70 flex items-center justify-end gap-2">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

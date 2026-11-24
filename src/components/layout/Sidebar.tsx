@@ -1,322 +1,212 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Home,
-  CheckCircle,
-  TrendingUp,
-  Calendar,
+  LayoutDashboard,
   Users,
-  Search,
-  Mail,
-  Vote,
-  Sparkles,
-  Inbox,
-  UserCheck,
-  Award,
+  CheckCircle2,
+  Calendar,
   Layers,
+  UserPlus,
+  Inbox,
+  TrendingUp,
+  Award,
+  Vote,
   LogOut,
-  User as UserIcon,
+  FileText,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
+import { useToast } from '../../context/ToastContext';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+interface NavItemProps {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onClose: () => void;
+  accent?: 'lead';
+}
+
+const SidebarNavItem: React.FC<NavItemProps> = ({ to, label, icon: Icon, onClose, accent }) => (
+  <NavLink
+    to={to}
+    onClick={onClose}
+    className={({ isActive }) =>
+      `w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-left transition-colors text-[13px] ${
+        isActive
+          ? 'bg-[#EFF6FF] text-[#1D63ED] font-semibold border border-[#BFDBFE]/80'
+          : 'text-slate-600 hover:bg-slate-100/80 hover:text-[#0A2540] font-medium'
+      }`
+    }
+  >
+    {({ isActive }) => (
+      <span className="flex items-center gap-2.5 min-w-0">
+        <Icon
+          className={`w-4 h-4 shrink-0 ${
+            isActive
+              ? 'text-[#1D63ED]'
+              : accent === 'lead'
+              ? 'text-amber-700'
+              : 'text-slate-400'
+          }`}
+        />
+        <span className="truncate">{label}</span>
+      </span>
+    )}
+  </NavLink>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { profile, isMentor, isLead, isStudent, signOut } = useAuth();
+  const { profile, isMentor, isLead, signOut } = useAuth();
   const { team } = useTeam();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
-  const getNavItems = () => {
-    if (isMentor) {
-      return [
-        { label: 'Overview', to: '/mentor/dashboard', icon: Home },
-        { label: 'Add Team', to: '/mentor/add-team', icon: Users },
-        { label: 'Meeting Requests', to: '/mentor/triage', icon: CheckCircle },
-        { label: 'Queue Monitor', to: '/mentor/queue-monitor', icon: Calendar },
-        { label: 'Profile', to: '/profile/edit', icon: UserIcon },
-      ];
+  const isLeader = Boolean(
+    isLead || (team && profile && team.leaderId === profile.id) || profile?.role === 'TEAM_LEAD'
+  );
+
+  const getInitials = (name?: string) => {
+    if (!name || !name.trim()) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
     }
-
-    if (isLead) {
-      return [
-        { label: 'Overview', to: '/lead/dashboard', icon: Home },
-        { label: 'Review Queue', to: '/lead/review', icon: CheckCircle },
-        { label: 'Progress', to: '/lead/progress', icon: TrendingUp },
-        { label: 'Meetings', to: '/lead/meeting', icon: Calendar },
-        { label: 'Join Requests', to: '/lead/join-requests', icon: Inbox },
-        { label: 'Find Mentor', to: '/lead/browse-mentors', icon: Award },
-        { label: 'Team Details', to: '/student/team-info', icon: Users },
-        { label: 'Profile', to: '/profile/edit', icon: UserIcon },
-      ];
-    }
-
-    // Student member
-    return [
-      { label: 'Dashboard', to: '/student/dashboard', icon: Home },
-      { label: 'Contributions', to: '/student/contributions', icon: Sparkles },
-      { label: 'Submissions Queue', to: '/student/submissions', icon: Layers },
-      { label: 'Mentor Meetings', to: '/student/meeting', icon: Calendar },
-      { label: 'My Team', to: '/student/team-info', icon: Users },
-      { label: 'Invitations', to: '/team-formation/invitations', icon: Mail },
-      { label: 'Leader Votes', to: '/student/leader-votes', icon: Vote },
-      { label: 'Browse Teams', to: '/team-formation/browse-teams', icon: Search },
-      { label: 'Profile', to: '/profile/edit', icon: UserIcon },
-    ];
+    return parts[0][0].toUpperCase();
   };
-
-  const navItems = getNavItems();
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop Overlay */}
       {isOpen && (
         <div
           onClick={onClose}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(16, 47, 72, 0.45)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 90,
-            display: 'block',
-          }}
+          className="fixed inset-0 bg-[#0A2540]/40 backdrop-blur-[2px] z-40 md:hidden"
         />
       )}
 
+      {/* 240px Fixed/Sticky Desktop Frosted Sidebar */}
       <aside
-        className={`sidebar-aside ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}
-        style={{
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-          width: 258,
-          padding: '24px 16px 18px 18px',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'rgba(249, 253, 254, 0.85)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(18px)',
-          zIndex: 95,
-          transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
+        className={`w-60 h-screen sticky top-0 frosted-chrome border-r border-[#D6E4EE] flex flex-col z-50 transition-transform duration-200 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        } fixed md:sticky top-0 left-0 bg-white/95 md:bg-white/90 backdrop-blur-md`}
       >
-        {/* Brand Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 11,
-            margin: '0 6px 28px',
-            textDecoration: 'none',
-            color: '#102F48',
-          }}
-        >
-          <div
-            style={{
-              position: 'relative',
-              width: 38,
-              height: 38,
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: 13,
-              color: '#31d2ec',
-              fontSize: 22,
-              fontWeight: 950,
-              background: 'linear-gradient(145deg, #061d57, #1748b4 64%, #0c2c80)',
-              boxShadow: '0 6px 16px rgba(15, 69, 149, 0.28)',
-              userSelect: 'none',
-            }}
-          >
-            T
-            <span
-              style={{
-                position: 'absolute',
-                right: 4,
-                top: 3,
-                fontSize: 11,
-                color: '#43d6ee',
-              }}
-            >
-              ↗
-            </span>
+        {/* Brand Header (56px high aligned with sticky top bar) */}
+        <div className="h-14 px-4 border-b border-[#D6E4EE] flex items-center gap-2.5 shrink-0">
+          <div className="w-8 h-8 rounded-lg brand-mark flex items-center justify-center text-white font-bold text-sm shadow-2xs shrink-0">
+            TM
           </div>
-          <div>
-            <div style={{ fontSize: 16.5, fontWeight: 900, letterSpacing: '-0.3px' }}>TrackMent</div>
-            <div
-              style={{
-                fontSize: 8,
-                letterSpacing: '1.35px',
-                color: '#7190A0',
-                fontWeight: 800,
-                marginTop: 2,
-              }}
-            >
+          <div className="min-w-0 flex-1">
+            <div className="text-[13.5px] font-bold text-[#0A2540] tracking-tight leading-none">
+              TrackMent
+            </div>
+            <div className="text-[9.5px] font-bold tracking-wider text-slate-400 mt-1 uppercase">
               PROJECT COMPANION
             </div>
           </div>
         </div>
 
-        {/* Role Badge Indicator */}
-        <div
-          style={{
-            margin: '0 6px 14px',
-            fontSize: 9,
-            letterSpacing: '1.2px',
-            fontWeight: 900,
-            color: '#7A94A3',
-          }}
-        >
-          WORKSPACE
-        </div>
+        {/* Scrollable Navigation Groups */}
+        <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
+          {/* FACULTY NAVIGATION */}
+          {isMentor && (
+            <div className="space-y-1">
+              <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                WORKSPACE
+              </div>
+              <SidebarNavItem to="/mentor/dashboard" label="Assigned Teams" icon={LayoutDashboard} onClose={onClose} />
+              <SidebarNavItem to="/mentor/queue-monitor" label="Appointment Scheduler" icon={Calendar} onClose={onClose} />
+              <SidebarNavItem to="/mentor/ledger" label="Official Ledger" icon={Layers} onClose={onClose} />
+              <SidebarNavItem to="/mentor/triage" label="Meeting Requests" icon={Clock} onClose={onClose} />
+              <SidebarNavItem to="/mentor/add-team" label="Browse & Add Teams" icon={UserPlus} onClose={onClose} />
+            </div>
+          )}
 
-        <div
-          style={{
-            margin: '0 6px 22px',
-            padding: '7px 12px',
-            borderRadius: 12,
-            border: '1px solid #D5E8EF',
-            background: 'rgba(255, 255, 255, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#102F48' }}>
-            {isMentor ? 'Faculty Mentor' : isLead ? 'Team Lead' : 'Student Member'}
-          </span>
-          <span
-            className={
-              isMentor ? 'badge badge-mentor' : isLead ? 'badge badge-lead' : 'badge badge-blue'
-            }
-          >
-            {isMentor ? 'MENTOR' : isLead ? 'LEAD' : 'STUDENT'}
-          </span>
-        </div>
+          {/* STUDENT & TEAM LEAD UNIFIED WORKSPACE */}
+          {!isMentor && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  WORKSPACE
+                </div>
+                <SidebarNavItem
+                  to={isLeader ? '/lead/dashboard' : '/student/dashboard'}
+                  label="Dashboard"
+                  icon={LayoutDashboard}
+                  onClose={onClose}
+                />
+                <SidebarNavItem to="/student/team-info" label="Team Workspace" icon={Users} onClose={onClose} />
+                <SidebarNavItem to="/student/contributions" label="Contributions & Proof" icon={CheckCircle2} onClose={onClose} />
+                <SidebarNavItem to="/student/meeting" label="Consultations & Schedule" icon={Calendar} onClose={onClose} />
+                <SidebarNavItem to="/student/ledger" label="Official Entry Ledger" icon={Layers} onClose={onClose} />
+                <SidebarNavItem to="/student/leader-votes" label="Peer Reviews" icon={Vote} onClose={onClose} />
+              </div>
 
-        {/* Navigation Items */}
-        <div
-          style={{
-            margin: '0 6px 10px',
-            fontSize: 9,
-            letterSpacing: '1.2px',
-            fontWeight: 900,
-            color: '#7A94A3',
-          }}
-        >
-          YOUR SPACE
-        </div>
+              {/* PRIVILEGED LEAD GOVERNANCE FEATURES (Only shown if user is Team Lead) */}
+              {isLeader && (
+                <div className="space-y-1 pt-2 border-t border-slate-100">
+                  <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center justify-between">
+                    <span>LEAD PRIVILEGES</span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] text-[9px] font-bold font-mono">
+                      LEAD
+                    </span>
+                  </div>
 
-        <nav
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            overflowY: 'auto',
-            flex: 1,
-            paddingRight: 4,
-          }}
-        >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={onClose}
-                style={({ isActive }) => ({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '10px 12px',
-                  borderRadius: 12,
-                  color: isActive ? '#145D93' : '#557186',
-                  fontSize: 12.5,
-                  fontWeight: 750,
-                  textDecoration: 'none',
-                  background: isActive
-                    ? 'linear-gradient(100deg, rgba(199, 233, 245, 0.9), rgba(229, 246, 247, 0.85))'
-                    : 'transparent',
-                  boxShadow: isActive ? 'inset 3px 0 #2C9CB9' : 'none',
-                  transition: 'background 0.18s ease, transform 0.18s ease',
-                })}
-              >
-                <Icon size={17} style={{ color: '#3A7C99', flexShrink: 0 }} />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
+                  <SidebarNavItem to="/lead/review" label="Review Submissions" icon={FileText} onClose={onClose} accent="lead" />
+                  <SidebarNavItem to="/lead/progress" label="Progress Tracking" icon={TrendingUp} onClose={onClose} accent="lead" />
+                  <SidebarNavItem to="/lead/join-requests" label="Join Requests" icon={Inbox} onClose={onClose} accent="lead" />
+                  <SidebarNavItem to="/team-formation/browse-students" label="Invite Candidates" icon={UserPlus} onClose={onClose} accent="lead" />
+                  <SidebarNavItem to="/lead/browse-mentors" label="Find Mentor" icon={Award} onClose={onClose} accent="lead" />
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
-        {/* Footer info & Logout */}
-        <div
-          style={{
-            marginTop: 'auto',
-            paddingTop: 14,
-            borderTop: '1px solid rgba(190, 218, 228, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: '#43AE9B',
-                boxShadow: '0 0 0 4px rgba(67, 174, 155, 0.15)',
-              }}
-            />
-            <span style={{ fontSize: 9.5, color: '#728C9B', fontWeight: 650 }}>Connected</span>
-          </div>
+        {/* Bottom User Card & Quick Profile */}
+        <div className="p-3 border-t border-[#D6E4EE] shrink-0 bg-white/70 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              navigate('/profile/edit');
+            }}
+            className="flex items-center gap-2.5 min-w-0 flex-1 text-left group rounded-lg p-1 -m-1 hover:bg-slate-50 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#0F4C81] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+              {getInitials(profile?.fullName)}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-[#0A2540] truncate group-hover:text-[#1D63ED] transition-colors">
+                {profile?.fullName || 'User'}
+              </div>
+              <div className="text-[11px] font-mono text-slate-400 truncate">
+                {profile?.usn || profile?.facultyCode || (isMentor ? 'Faculty' : 'Member')}
+              </div>
+            </div>
+          </button>
 
           <button
+            type="button"
             onClick={async () => {
+              onClose();
               await signOut();
+              showToast('Logged out.', 'info');
               navigate('/login');
             }}
-            title="Sign Out of TrackMent"
-            style={{
-              background: '#FFF1F2',
-              border: '1px solid #FECDD3',
-              color: '#B34F5C',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 11.5,
-              fontWeight: 800,
-              cursor: 'pointer',
-              padding: '5px 10px',
-              borderRadius: 8,
-              transition: 'all 0.15s ease',
-            }}
+            title="Sign Out"
+            aria-label="Sign Out"
+            className="w-8 h-8 rounded-lg border border-[#D6E4EE] bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-400 flex items-center justify-center transition-colors shrink-0"
           >
-            <LogOut size={13} />
-            <span>Log Out</span>
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </aside>
-
-      <style>{`
-        @media (min-width: 801px) {
-          .sidebar-aside {
-            transform: translateX(0) !important;
-          }
-        }
-        @media (max-width: 800px) {
-          .sidebar-aside.sidebar-closed {
-            transform: translateX(-100%) !important;
-          }
-          .sidebar-aside.sidebar-open {
-            transform: translateX(0) !important;
-          }
-        }
-      `}</style>
     </>
   );
 };

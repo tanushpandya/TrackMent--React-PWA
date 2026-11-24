@@ -31,6 +31,8 @@ import { StorageService } from '../../services/storage.service';
 import { ContributionService } from '../../services/contribution.service';
 import { TeamService } from '../../services/team.service';
 import { AppCard } from '../../components/common/AppCard';
+import { SecurePdfViewerModal } from '../../components/common/SecurePdfViewerModal';
+import { sanitizeExternalUrl } from '../../utils/url';
 
 // Bounded O(1) date formatter with India Standard Time context
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
@@ -168,6 +170,11 @@ export const MentorGanttChart: React.FC<Props> = ({
   singleTeamContributions,
 }) => {
   // P0 Fix: Manage team selection through a single synchronized ID
+  const [pdfPreviewFile, setPdfPreviewFile] = useState<{
+    storagePath: string;
+    fileName: string;
+    submissionNumber: string | number;
+  } | null>(null);
   const [internalTeamId, setInternalTeamId] = useState<number | null>(() => {
     if (singleTeam) return singleTeam.id;
     if (selectedTeamId !== undefined) return selectedTeamId;
@@ -766,7 +773,7 @@ export const MentorGanttChart: React.FC<Props> = ({
             }}
           >
             <Loader2 size={32} color="#0B4D88" className="spin" />
-            <div style={{ fontSize: 14, fontWeight: 750, color: '#0F172A' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
               Loading milestone timeline & deliverables for {activeTeam.teamName}...
             </div>
             <div style={{ fontSize: 12, color: '#64748B' }}>
@@ -1267,7 +1274,7 @@ export const MentorGanttChart: React.FC<Props> = ({
                         <h5
                           style={{
                             fontSize: 14.5,
-                            fontWeight: 850,
+                            fontWeight: 800,
                             color: '#0F172A',
                             margin: 0,
                             overflow: 'hidden',
@@ -1513,13 +1520,12 @@ export const MentorGanttChart: React.FC<Props> = ({
 
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              const url = await StorageService.getSignedUrl(file.storagePath);
-                              window.open(url, '_blank', 'noopener,noreferrer');
-                            } catch (e: any) {
-                              alert(e.message || 'Could not open file.');
-                            }
+                          onClick={() => {
+                            setPdfPreviewFile({
+                              storagePath: file.storagePath,
+                              fileName: file.fileName,
+                              submissionNumber: selectedContribution.id,
+                            });
                           }}
                           style={{
                             display: 'inline-flex',
@@ -1551,10 +1557,13 @@ export const MentorGanttChart: React.FC<Props> = ({
                     External Resource Links
                   </label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {selectedContribution.links.map((link, idx) => (
+                    {selectedContribution.links
+                      .map((link) => sanitizeExternalUrl(link))
+                      .filter((href): href is string => Boolean(href))
+                      .map((safeHref, idx) => (
                       <a
                         key={idx}
-                        href={link}
+                        href={safeHref}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -1573,7 +1582,7 @@ export const MentorGanttChart: React.FC<Props> = ({
                       >
                         <ExternalLink size={15} style={{ flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {link}
+                          {safeHref}
                         </span>
                       </a>
                     ))}
@@ -1584,6 +1593,19 @@ export const MentorGanttChart: React.FC<Props> = ({
           </div>
         </div>
       )}
+      {/* Secure In-App PDF Viewer Modal (Prevents Supabase URL/Credential Exposure) */}
+      <SecurePdfViewerModal
+        isOpen={Boolean(pdfPreviewFile)}
+        onClose={() => setPdfPreviewFile(null)}
+        resolveUrl={
+          pdfPreviewFile
+            ? () => StorageService.getSignedUrl(pdfPreviewFile.storagePath)
+            : undefined
+        }
+        teamName={activeTeam?.teamName || 'Team'}
+        submissionNumber={pdfPreviewFile?.submissionNumber ?? 1}
+        title={pdfPreviewFile?.fileName}
+      />
     </div>
   );
 };
