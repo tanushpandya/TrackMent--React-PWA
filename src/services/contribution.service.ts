@@ -1,6 +1,7 @@
 import { supabase, PROOFS_BUCKET } from './supabase';
 import { fastCache } from '../utils/cache';
 import { ContributionModel, ContributionVote, ContributionStatus } from '../types';
+import { sanitizeExternalUrlList } from '../utils/url';
 
 export class ContributionService {
   static async fetchForTeam(teamId: number): Promise<ContributionModel[]> {
@@ -73,7 +74,7 @@ export class ContributionService {
         author_id: params.authorId,
         title: params.title.trim(),
         description: params.description.trim(),
-        links: params.links || [],
+        links: sanitizeExternalUrlList(params.links),
         status: 'PENDING',
       })
       .select('*, profiles:author_id(full_name)')

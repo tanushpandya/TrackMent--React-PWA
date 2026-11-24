@@ -80,7 +80,7 @@ export class AuthService {
       if (error) {
         if (typeof window !== 'undefined') {
           try {
-            const cached = localStorage.getItem(`trackment_offline_profile_${userId}`);
+            const cached = sessionStorage.getItem(`trackment_offline_profile_${userId}`);
             if (cached) return JSON.parse(cached);
           } catch (_) {}
         }
@@ -127,7 +127,7 @@ export class AuthService {
 
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem(`trackment_offline_profile_${userId}`, JSON.stringify(mapped));
+          sessionStorage.setItem(`trackment_offline_profile_${userId}`, JSON.stringify(mapped));
         } catch (_) {}
       }
 

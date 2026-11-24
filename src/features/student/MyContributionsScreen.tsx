@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { sanitizeExternalUrl } from '../../utils/url';
 import {
   Sparkles,
   Plus,
@@ -462,16 +463,19 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
                     {/* Proof Links */}
                     {((c.proof_links && c.proof_links.length > 0) || (c.links && c.links.length > 0)) && (
                       <div className="flex flex-wrap gap-2 pt-1">
-                        {(c.proof_links || c.links || []).map((link: string, idx: number) => (
+                        {(c.proof_links || c.links || [])
+                          .map((link: string) => sanitizeExternalUrl(link))
+                          .filter((href): href is string => Boolean(href))
+                          .map((safeHref: string, idx: number) => (
                           <a
                             key={idx}
-                            href={link}
+                            href={safeHref}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 hover:bg-[#EFF6FF] text-[11px] font-mono text-[#1D63ED] border border-[#D6E4EE] hover:border-[#BFDBFE] transition-colors"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span className="truncate max-w-[200px]">{link}</span>
+                            <span className="truncate max-w-[200px]">{safeHref}</span>
                           </a>
                         ))}
                       </div>

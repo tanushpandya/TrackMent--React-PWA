@@ -32,6 +32,7 @@ import { ContributionService } from '../../services/contribution.service';
 import { TeamService } from '../../services/team.service';
 import { AppCard } from '../../components/common/AppCard';
 import { SecurePdfViewerModal } from '../../components/common/SecurePdfViewerModal';
+import { sanitizeExternalUrl } from '../../utils/url';
 
 // Bounded O(1) date formatter with India Standard Time context
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
@@ -1533,10 +1534,13 @@ export const MentorGanttChart: React.FC<Props> = ({
                     External Resource Links
                   </label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {selectedContribution.links.map((link, idx) => (
+                    {selectedContribution.links
+                      .map((link) => sanitizeExternalUrl(link))
+                      .filter((href): href is string => Boolean(href))
+                      .map((safeHref, idx) => (
                       <a
                         key={idx}
-                        href={link}
+                        href={safeHref}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -1555,7 +1559,7 @@ export const MentorGanttChart: React.FC<Props> = ({
                       >
                         <ExternalLink size={15} style={{ flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {link}
+                          {safeHref}
                         </span>
                       </a>
                     ))}
