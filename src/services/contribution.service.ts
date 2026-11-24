@@ -84,6 +84,25 @@ export class ContributionService {
     return this.mapContribution(data);
   }
 
+  static async createContribution(params: {
+    teamId: number;
+    authorId?: string;
+    studentId?: string;
+    title: string;
+    description: string;
+    contributionType?: string;
+    proofLinks?: string[];
+    links?: string[];
+  }): Promise<ContributionModel> {
+    return this.submit({
+      teamId: params.teamId,
+      authorId: params.authorId || params.studentId || '',
+      title: params.title,
+      description: params.description,
+      links: params.proofLinks || params.links || [],
+    });
+  }
+
   static async submitReview(params: {
     contributionId: number;
     reviewerId: string;

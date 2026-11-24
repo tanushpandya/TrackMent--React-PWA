@@ -626,14 +626,27 @@ export class TeamService {
     }));
   }
 
-  static async cancelInvitation(teamId: number, studentId: string): Promise<void> {
-    const { error } = await supabase
-      .from('team_invitations')
-      .delete()
-      .eq('team_id', teamId)
-      .eq('student_id', studentId)
-      .eq('status', 'PENDING');
-    if (error) throw error;
+  static async cancelInvitation(teamIdOrId: number, studentId?: string): Promise<void> {
+    if (studentId !== undefined) {
+      const { error } = await supabase
+        .from('team_invitations')
+        .delete()
+        .eq('team_id', teamIdOrId)
+        .eq('student_id', studentId)
+        .eq('status', 'PENDING');
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('team_invitations')
+        .delete()
+        .eq('id', teamIdOrId)
+        .eq('status', 'PENDING');
+      if (error) throw error;
+    }
+  }
+
+  static async cancelTeamInvitation(teamIdOrId: number, studentId?: string): Promise<void> {
+    return this.cancelInvitation(teamIdOrId, studentId);
   }
 
   static async sendInvitation(teamId: number, studentId: string): Promise<void> {
@@ -643,6 +656,10 @@ export class TeamService {
       status: 'PENDING',
     });
     if (error) throw error;
+  }
+
+  static async sendTeamInvitation(teamId: number, studentId: string): Promise<void> {
+    return this.sendInvitation(teamId, studentId);
   }
 
   static async respondToInvitation(invitationId: number, accept: boolean): Promise<void> {

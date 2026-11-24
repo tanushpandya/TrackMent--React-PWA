@@ -16,6 +16,7 @@ import { TeamModel, TeamReportModel } from '../../types';
 import { TeamService } from '../../services/team.service';
 import { MAX_REPORT_FILE_SIZE_BYTES } from '../../services/supabase';
 import { AppCard } from './AppCard';
+import { SecurePdfViewerModal } from './SecurePdfViewerModal';
 
 interface Props {
   team: TeamModel;
@@ -118,16 +119,16 @@ export const TeamReportSubmissionCard: React.FC<Props> = ({
     }
   };
 
+  const [activePdfPreview, setActivePdfPreview] = useState<{
+    report: TeamReportModel;
+    submissionNumber: number;
+  } | null>(null);
+
   const handleViewReport = async (report: TeamReportModel) => {
-    setViewingSlot(report.slot);
-    try {
-      const url = await TeamService.getReportSignedUrl(report.storagePath);
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (err: any) {
-      alert(err.message || 'Failed to generate secure viewing link.');
-    } finally {
-      setViewingSlot(null);
-    }
+    setActivePdfPreview({
+      report,
+      submissionNumber: report.slot === 'primary' ? 1 : 2,
+    });
   };
 
   const handleDeleteReport = async (report: TeamReportModel) => {
@@ -587,6 +588,19 @@ export const TeamReportSubmissionCard: React.FC<Props> = ({
           </div>
         </div>
       )}
+      {/* Secure In-App PDF Viewer Modal (Prevents Supabase URL/Credential Exposure) */}
+      <SecurePdfViewerModal
+        isOpen={Boolean(activePdfPreview)}
+        onClose={() => setActivePdfPreview(null)}
+        resolveUrl={
+          activePdfPreview
+            ? () => TeamService.getReportSignedUrl(activePdfPreview.report.storagePath)
+            : undefined
+        }
+        teamName={team.teamName}
+        submissionNumber={activePdfPreview?.submissionNumber ?? 1}
+        title={activePdfPreview?.report.fileName}
+      />
     </AppCard>
   );
 };

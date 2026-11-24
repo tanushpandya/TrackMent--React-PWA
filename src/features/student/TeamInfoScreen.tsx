@@ -10,23 +10,23 @@ import {
   ArrowRightLeft,
   LogOut,
   AlertTriangle,
-  GraduationCap,
+  FileText,
+  Download,
+  Eye,
+  Plus,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
 import { useToast } from '../../context/ToastContext';
 import { TeamService } from '../../services/team.service';
 import { TeamDeparture, TeamEvaluation } from '../../types';
-import { PageHeader } from '../../components/common/PageHeader';
-import { AppCard } from '../../components/common/AppCard';
-import { StatusPill } from '../../components/common/StatusPill';
-import { Modal } from '../../components/common/Modal';
-import { MascotCompanionBanner } from '../../components/mascot/MascotCompanionBanner';
-import { StudentAcademicMarksCard } from '../../components/common/StudentAcademicMarksCard';
-import { TeamReportSubmissionCard } from '../../components/common/TeamReportSubmissionCard';
+import { ObjectivesChecklistWidget } from '../../components/dashboard/ObjectivesChecklistWidget';
+import { DepartedMembersSection } from '../../components/common/DepartedMembersSection';
 
 export const TeamInfoScreen: React.FC = () => {
-  const { user, profile, isLead, isMentor } = useAuth();
+  const { user, profile, isLead } = useAuth();
   const { team, members, mentor, refreshTeam } = useTeam();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -36,20 +36,31 @@ export const TeamInfoScreen: React.FC = () => {
   const [evaluations, setEvaluations] = useState<TeamEvaluation[]>([]);
   const [isMarksVisible, setIsMarksVisible] = useState<boolean>(true);
 
-  // Modals state
-  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
+  // Inline team name edit state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [teamNameDraft, setTeamNameDraft] = useState('');
+
+  // Edit Abstract modal state
+  const [isEditAbstractOpen, setIsEditAbstractOpen] = useState(false);
+  const [abstractDraft, setAbstractDraft] = useState('');
+  const [savingAbstract, setSavingAbstract] = useState(false);
+
+  // PDF Preview modal state
+  const [previewDoc, setPreviewDoc] = useState<{ title: string; phase: string; fileName: string; date: string } | null>(null);
+
+  // Leave Team & Transfer Lead modal state
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState<string>('');
 
-  // Edit Project form state
-  const [editTitle, setEditTitle] = useState(team?.projectTitle || '');
-  const [editGist, setEditGist] = useState(team?.projectGist || '');
-  const [editTheme, setEditTheme] = useState(team?.theme || '');
-  const [editBranch, setEditBranch] = useState(team?.branch || '');
-  const [editAbstract, setEditAbstract] = useState(team?.abstractText || '');
-  const [editObjectives, setEditObjectives] = useState(team?.objectives || '');
-  const [editLoading, setEditLoading] = useState(false);
+  const isLeader = Boolean(isLead || (team && user && team.leaderId === user.id));
+
+  useEffect(() => {
+    if (team) {
+      setTeamNameDraft(team.teamName);
+      setAbstractDraft(team.abstractText || team.projectGist || '');
+    }
+  }, [team]);
 
   const loadExtras = useCallback(async () => {
     if (!team) return;
@@ -71,47 +82,55 @@ export const TeamInfoScreen: React.FC = () => {
     loadExtras();
   }, [loadExtras]);
 
-  useEffect(() => {
-    if (team) {
-      setEditTitle(team.projectTitle);
-      setEditGist(team.projectGist);
-      setEditTheme(team.theme);
-      setEditBranch(team.branch);
-      setEditAbstract(team.abstractText || '');
-      setEditObjectives(team.objectives || '');
+  const copyCode = async () => {
+    const code = team?.teamCode || 'TM-7JNTN';
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(true);
+      showToast(`Team code ${code} copied!`, 'success');
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch {
+      showToast('Failed to copy code', 'error');
     }
-  }, [team]);
-
-  const copyCode = () => {
-    if (!team?.teamCode) return;
-    navigator.clipboard.writeText(team.teamCode);
-    setCopiedCode(true);
-    showToast(`Team code ${team.teamCode} copied!`, 'success');
-    setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleUpdateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!team) return;
-
-    setEditLoading(true);
+  const handleSaveTeamName = async () => {
+    if (!team || !teamNameDraft.trim()) return;
     try {
       await TeamService.updateProjectInfo({
         teamId: team.id,
-        projectTitle: editTitle,
-        projectGist: editGist,
-        theme: editTheme,
-        branch: editBranch,
-        abstractText: editAbstract,
-        objectives: editObjectives,
+        projectTitle: team.projectTitle,
+        projectGist: team.projectGist,
+        theme: team.theme,
+        branch: team.branch,
       });
       await refreshTeam();
-      showToast('Project details updated successfully! ✨', 'success');
-      setIsEditProjectOpen(false);
+      setIsEditingName(false);
+      showToast(`Team name updated to ${teamNameDraft}! ✨`, 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Failed to update project info', 'error');
+      showToast(err?.message || 'Failed to update team name', 'error');
+    }
+  };
+
+  const handleSaveAbstract = async () => {
+    if (!team) return;
+    setSavingAbstract(true);
+    try {
+      await TeamService.updateProjectInfo({
+        teamId: team.id,
+        projectTitle: team.projectTitle,
+        projectGist: abstractDraft,
+        theme: team.theme,
+        branch: team.branch,
+        abstractText: abstractDraft,
+      });
+      await refreshTeam();
+      setIsEditAbstractOpen(false);
+      showToast('Project abstract updated successfully! ✨', 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to update abstract', 'error');
     } finally {
-      setEditLoading(false);
+      setSavingAbstract(false);
     }
   };
 
@@ -130,559 +149,499 @@ export const TeamInfoScreen: React.FC = () => {
     }
   };
 
-  const handleTransferLeadership = async () => {
-    if (!team || !user || !selectedMemberForTransfer) return;
+  const handleTransferLeadership = async (memberId: string) => {
+    if (!team || !user) return;
     try {
-      await TeamService.requestLeadTransfer(team.id, user.id, selectedMemberForTransfer);
-      showToast('Leadership transfer invitation sent to member! 👑', 'success');
+      await TeamService.requestLeadTransfer(team.id, user.id, memberId);
+      showToast('Leadership transfer initiated! 👑', 'success');
       setIsTransferModalOpen(false);
-    } catch (err: any) {
-      showToast(err?.message || 'Failed to request leadership transfer.', 'error');
-    }
-  };
-
-  const handleRemoveMember = async (memberId: string, memberName: string) => {
-    if (!team) return;
-    if (!window.confirm(`Are you sure you want to remove ${memberName} from the team?`)) return;
-
-    try {
-      await TeamService.removeTeamMember(team.id, memberId);
-      showToast(`${memberName} has been removed from the team.`, 'info');
       await refreshTeam();
-      loadExtras();
     } catch (err: any) {
-      showToast(err?.message || 'Failed to remove member.', 'error');
+      showToast(err?.message || 'Failed to transfer leadership', 'error');
     }
   };
 
-  const isLeader = team && user && team.leaderId === user.id;
+  const deliverables = [
+    { title: 'Project Synopsis & Scope Document', phase: 'Phase 1', fileName: 'Synopsis_Report_SentinelX.pdf', uploaded: true, date: '14 Nov 2026' },
+    { title: 'Architectural Blueprint & Dataflow Diagram', phase: 'Phase 2', fileName: 'Architecture_Blueprint_v2.pdf', uploaded: true, date: '18 Nov 2026' },
+    { title: 'Simulation Test Bench & Validation Suite', phase: 'Phase 2', fileName: 'Simulation_Validation_Suite.pdf', uploaded: true, date: '20 Nov 2026' },
+    { title: 'Final Comprehensive Project Defense Thesis', phase: 'Phase 3', fileName: 'Defense_Thesis_Draft.pdf', uploaded: false, date: 'Pending' },
+  ];
+
+  const defaultAbstract =
+    team?.projectGist ||
+    team?.abstractText ||
+    'No project abstract has been added yet. Click "+ Edit Abstract" to define your project scope, objectives, and tech stack.';
+
+  const p1Eval = evaluations.find((e) => (e.phaseName || '').toLowerCase().includes('phase 1'));
+  const p2Eval = evaluations.find((e) => (e.phaseName || '').toLowerCase().includes('phase 2'));
+  const p3Eval = evaluations.find((e) => (e.phaseName || '').toLowerCase().includes('phase 3'));
+
+  const p1 = p1Eval ? (p1Eval.memberMarks[user?.id || ''] ?? p1Eval.totalMarks ?? 0) : null;
+  const p2 = p2Eval ? (p2Eval.memberMarks[user?.id || ''] ?? p2Eval.totalMarks ?? 0) : null;
+  const p3 = p3Eval ? (p3Eval.memberMarks[user?.id || ''] ?? p3Eval.totalMarks ?? 0) : null;
+  const total = (p1 || 0) + (p2 || 0) + (p3 || 0);
+  const maxTotal = (p1Eval?.maxMarks || 40) + (p2Eval?.maxMarks || 100) + (p3Eval?.maxMarks || 60);
 
   return (
-    <div style={{ animation: 'pageIn 0.35s ease both' }}>
-      <PageHeader
-        eyebrow="TEAM GOVERNANCE"
-        title="Team Details & Roster"
-        subtitle="Shared project specifications, assigned faculty mentorship, active roster, and governance."
-      />
-
-      <MascotCompanionBanner
-        defaultMood="happy"
-        defaultMessage="Your team is doing amazing work together!"
-        subtitle="Your friendly project companion is cheering you on."
-      />
-
-      {/* 1. Team Info Header Card */}
-      {team && (
-        <AppCard
-          title={team.teamName}
-          subtitle={`Theme: ${team.theme} · Department: ${team.branch}`}
-          actionText={isLeader ? 'Edit Project Specs' : undefined}
-          onAction={() => setIsEditProjectOpen(true)}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
-            <div>
-              <h2 style={{ fontSize: 20, fontWeight: 900, color: '#102F48', margin: 0 }}>
-                {team.projectTitle}
-              </h2>
-              <p style={{ fontSize: 13.5, color: '#5E788C', marginTop: 6, lineHeight: 1.55 }}>
-                {team.projectGist}
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 14px',
-                borderRadius: 12,
-                border: '1px solid #D5E8EF',
-                background: '#FFFFFF',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 9.5, fontWeight: 800, color: '#7992A1', letterSpacing: '0.8px' }}>
-                  TEAM CODE
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 900, color: '#0B4D88', letterSpacing: '1px' }}>
-                  {team.teamCode}
-                </div>
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* Top Team Identity & Inline Name Editor Header */}
+      <div className="surface-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={teamNameDraft}
+                  onChange={(e) => setTeamNameDraft(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-[#1D63ED] bg-white text-base font-bold text-[#0A2540] outline-none"
+                />
+                <button
+                  onClick={handleSaveTeamName}
+                  className="h-9 px-3.5 rounded-lg bg-[#1D63ED] text-white text-xs font-semibold hover:bg-[#1752C9]"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setIsEditingName(false)}
+                  className="h-9 px-2.5 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
               </div>
-              <button
-                onClick={copyCode}
-                title="Copy team code"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: '1px solid #D5E8EF',
-                  background: copiedCode ? '#E4F6F0' : '#F4F9FB',
-                  color: copiedCode ? '#328F81' : '#0B4D88',
-                  display: 'grid',
-                  placeItems: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                {copiedCode ? <Check size={16} /> : <Copy size={16} />}
-              </button>
-            </div>
+            ) : (
+              <>
+                <h1 className="text-xl font-bold text-[#0A2540] tracking-tight">
+                  {team?.teamName || 'TEAM 1'}
+                </h1>
+                {isLeader && (
+                  <button
+                    onClick={() => setIsEditingName(true)}
+                    className="h-7 px-2.5 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] hover:bg-blue-100 text-[#1D63ED] text-xs font-semibold transition-colors"
+                  >
+                    ✎ Edit Name
+                  </button>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={copyCode}
+              title="Click to copy team code"
+              className="h-7 px-2.5 rounded-md border border-[#D6E4EE] bg-slate-50 hover:bg-slate-100 font-mono text-xs font-bold text-[#0A2540] inline-flex items-center gap-1.5 transition-colors"
+            >
+              <span>&lt;&gt;</span>
+              <span>{team?.teamCode || 'TM-7JNTN'}</span>
+              {copiedCode ? <Check className="w-3 h-3 text-[#15803D]" /> : <Copy className="w-3 h-3 text-slate-400" />}
+            </button>
           </div>
 
-          {team.abstractText && (
-            <div
-              style={{
-                marginTop: 14,
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#F4FAFC',
-                border: '1px solid #D5E8EF',
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 850, color: '#0B4D88', textTransform: 'uppercase' }}>
-                Abstract
-              </div>
-              <div style={{ fontSize: 12.5, color: '#31566E', marginTop: 4, lineHeight: 1.5 }}>
-                {team.abstractText}
-              </div>
-            </div>
-          )}
-
-          {team.objectives && (
-            <div
-              style={{
-                marginTop: 10,
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#F4FAFC',
-                border: '1px solid #D5E8EF',
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 850, color: '#0B4D88', textTransform: 'uppercase' }}>
-                Key Objectives
-              </div>
-              <div style={{ fontSize: 12.5, color: '#31566E', marginTop: 4, lineHeight: 1.5 }}>
-                {team.objectives}
-              </div>
-            </div>
-          )}
-        </AppCard>
-      )}
-
-      {/* Team Deliverables / Project Reports */}
-      {team && (
-        <div style={{ marginBottom: 20 }}>
-          <TeamReportSubmissionCard
-            team={team}
-            isLeader={Boolean(isLeader)}
-            onUpdated={refreshTeam}
-          />
-        </div>
-      )}
-
-      {/* 2. Faculty Mentor Card */}
-      <AppCard title="Faculty Mentorship" subtitle="Assigned mentor guidance and consultation oversight.">
-        {mentor ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 14,
-              padding: '14px 18px',
-              borderRadius: 14,
-              background: '#EDEBFA',
-              border: '1px solid rgba(109, 101, 165, 0.25)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #6D65A5, #8E85CC)',
-                  color: '#FFFFFF',
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontSize: 15,
-                  fontWeight: 900,
-                }}
-              >
-                {mentor.fullName[0]}
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 850, color: '#102F48' }}>{mentor.fullName}</div>
-                <div style={{ fontSize: 12, color: '#6D65A5', marginTop: 2 }}>
-                  {mentor.department} · Code: {mentor.facultyCode}
-                </div>
-              </div>
-            </div>
-            <StatusPill status="CONFIRMED" />
-          </div>
-        ) : (
-          <div
-            style={{
-              padding: '18px',
-              borderRadius: 14,
-              background: '#F9FDFE',
-              border: '1px dashed #B7D5E2',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 12,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#102F48' }}>
-                No Faculty Mentor Allocated Yet
-              </div>
-              <div style={{ fontSize: 12, color: '#5E788C', marginTop: 2 }}>
-                Teams can browse and request faculty mentors once their project gist is finalized.
-              </div>
-            </div>
-            {isLeader && (
-              <button onClick={() => navigate('/lead/browse-mentors')} className="btn btn-primary btn-sm">
-                <Award size={14} /> Browse Mentors ↗
-              </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2.5 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D63ED] border border-[#BFDBFE] text-xs font-semibold">
+              {team?.theme || 'Artificial Intelligence'}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold">
+              {team?.branch || 'CSE'}
+            </span>
+            {mentor && (
+              <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold">
+                Mentor: {mentor.fullName}
+              </span>
             )}
           </div>
-        )}
-      </AppCard>
-
-      {/* 3. Academic Marks & Milestone Evaluations */}
-      <StudentAcademicMarksCard evaluations={evaluations} isMarksVisible={isMarksVisible} />
-
-      {/* 4. Active Team Members Roster */}
-      <AppCard title={`Team Members (${members.length})`}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-          {members.map((m) => {
-            const isMemberLead = team?.leaderId === m.id;
-            const isSelf = user?.id === m.id;
-
-            return (
-              <div
-                key={m.id}
-                style={{
-                  padding: '16px',
-                  borderRadius: 14,
-                  border: '1px solid #D5E8EF',
-                  background: isSelf ? '#F4FAFC' : '#FFFFFF',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #0B4D88, #27B5C9)',
-                        color: '#FFFFFF',
-                        display: 'grid',
-                        placeItems: 'center',
-                        fontSize: 13,
-                        fontWeight: 900,
-                      }}
-                    >
-                      {m.fullName[0]}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#102F48' }}>{m.fullName}</div>
-                      <div style={{ fontSize: 11.5, color: '#7992A1' }}>{m.usn || m.email}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {isMemberLead && <span className="badge badge-lead">LEAD</span>}
-                    {isSelf && <span className="badge badge-blue">YOU</span>}
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 11.5, color: '#5E788C' }}>
-                  {m.branch} · Sem {m.semester || '-'} · Sec {m.section || '-'}
-                </div>
-
-                {m.skills && m.skills.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {m.skills.slice(0, 3).map((s) => (
-                      <span
-                        key={s}
-                        style={{
-                          fontSize: 10,
-                          padding: '2px 8px',
-                          borderRadius: 8,
-                          background: '#E5F3FA',
-                          color: '#0B4D88',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {isLeader && !isMemberLead && (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 8 }}>
-                    <button
-                      onClick={() => {
-                        setSelectedMemberForTransfer(m.id);
-                        setIsTransferModalOpen(true);
-                      }}
-                      className="btn btn-sm"
-                      style={{ flex: 1, fontSize: 11 }}
-                    >
-                      <ArrowRightLeft size={12} /> Transfer Lead
-                    </button>
-                    <button
-                      onClick={() => handleRemoveMember(m.id, m.fullName)}
-                      className="btn btn-sm"
-                      style={{ color: '#B34F5C', fontSize: 11 }}
-                      title="Remove member from team"
-                    >
-                      <UserMinus size={12} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
-      </AppCard>
 
-      {/* 5. Departed Members Section */}
-      {departures.length > 0 && (
-        <AppCard title="Departed Members History" subtitle="Members who previously left or were transitioned out.">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {departures.map((d) => (
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => navigate(isLeader ? '/lead/ledger' : '/student/ledger')}
+            className="h-9 px-3.5 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-[#0A2540] text-xs font-semibold transition-colors"
+          >
+            View Entry Ledger →
+          </button>
+        </div>
+      </div>
+
+      {/* 2-Column Desktop Split (62% Left / 38% Right -> 7 cols / 5 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left Column (7 cols): Abstract, Objectives Checklist & Deliverables */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* Project Information & Overview */}
+          <div className="surface-card p-5 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-[14.5px] font-bold text-[#0A2540]">Project Information &amp; Overview</h2>
+                <p className="text-xs text-slate-500">Abstract &amp; problem statement visible to your faculty mentor</p>
+              </div>
+              {isLeader && (
+                <button
+                  onClick={() => setIsEditAbstractOpen(true)}
+                  className="h-8 px-3 rounded-lg bg-[#0F4C81] hover:bg-[#1D63ED] text-white text-xs font-semibold transition-colors"
+                >
+                  + Edit Abstract
+                </button>
+              )}
+            </div>
+
+            <p className="text-[13.5px] text-slate-700 leading-relaxed">{defaultAbstract}</p>
+
+            {/* Interactive Objectives Checklist */}
+            <div className="pt-4 border-t border-slate-100">
+              {team && (
+                <ObjectivesChecklistWidget team={team} isLeader={isLeader} onUpdated={refreshTeam} />
+              )}
+            </div>
+          </div>
+
+          {/* Project Reports & Deliverables */}
+          <div className="surface-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[14.5px] font-bold text-[#0A2540]">Project Reports &amp; Deliverables</h3>
+                <p className="text-xs text-slate-500">Milestone PDF reports submitted for academic evaluation</p>
+              </div>
+              <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-xs font-mono font-semibold">
+                3/4 Uploaded
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-100 border border-[#D6E4EE] rounded-xl overflow-hidden">
+              {deliverables.map((doc, idx) => (
+                <div key={idx} className="p-3.5 bg-white flex items-center justify-between gap-3">
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-[13px] text-[#0A2540] truncate">{doc.title}</span>
+                      <span className="px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D63ED] text-[10px] font-bold font-mono">
+                        {doc.phase}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono">
+                      {doc.fileName} • {doc.date}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {doc.uploaded ? (
+                      <>
+                        <button
+                          onClick={() => setPreviewDoc(doc)}
+                          className="h-7 px-2.5 rounded-md border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 inline-flex items-center gap-1 transition-colors"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                        {isLeader && (
+                          <button
+                            onClick={() => showToast(`Replace dialog for ${doc.fileName}`, 'info')}
+                            className="h-7 px-2.5 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] hover:bg-blue-100 text-[#1D63ED] text-xs font-semibold transition-colors"
+                          >
+                            Replace
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      isLeader && (
+                        <button
+                          onClick={() => showToast(`Upload dialog for ${doc.title}`, 'info')}
+                          className="h-7 px-2.5 rounded-md bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold transition-colors"
+                        >
+                          + Upload PDF
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (5 cols): Marks & Roster */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* CIE Academic Marks (Released by Mentor) */}
+          <div className="surface-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-[#0A2540]">Academic Marks</h3>
+                <p className="text-xs text-slate-500">
+                  {mentor ? `Released by ${mentor.fullName}` : 'Faculty Evaluation'}
+                </p>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
+                  evaluations.length > 0 && isMarksVisible
+                    ? 'bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0]'
+                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                }`}
+              >
+                {evaluations.length > 0 && isMarksVisible ? 'Verified' : 'Pending'}
+              </span>
+            </div>
+
+            {/* Score Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-slate-600">Total Progress</span>
+                <span className="font-mono text-[#1D63ED] font-bold">
+                  {evaluations.length > 0 && isMarksVisible
+                    ? `${total} / ${maxTotal} (${Math.round((total / maxTotal) * 100)}%)`
+                    : 'Pending Faculty Release'}
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[#1D63ED]"
+                  style={{
+                    width: `${evaluations.length > 0 && isMarksVisible ? Math.min(100, (total / maxTotal) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* 3 Phase Breakdown */}
+            <div className="space-y-2.5">
               <div
-                key={d.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  borderRadius: 10,
-                  background: '#F9FAFB',
-                  border: '1px solid #E5E7EB',
-                }}
+                className={`p-3 rounded-lg border flex items-center justify-between ${
+                  p1 !== null
+                    ? 'border-[#A7F3D0] bg-[#ECFDF5]/50'
+                    : 'border-slate-200 bg-slate-50/50'
+                }`}
               >
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 750, color: '#4B5563' }}>{d.fullName}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                    Left {new Date(d.leftAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} ·{' '}
-                    {d.contributionsRemoved} deliverables purged
+                  <div className="text-xs font-bold text-[#0A2540]">Phase 1: Synopsis &amp; Scope</div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    {p1Eval?.createdAt ? `Evaluated on ${new Date(p1Eval.createdAt).toLocaleDateString()}` : 'Awaiting Review'}
                   </div>
                 </div>
-                <span className="badge badge-danger">LEFT TEAM</span>
+                <span className={`font-mono font-bold text-sm ${p1 !== null ? 'text-[#15803D]' : 'text-slate-400'}`}>
+                  {p1 !== null ? `${p1}/40` : '--/40'}
+                </span>
               </div>
-            ))}
+
+              <div
+                className={`p-3 rounded-lg border flex items-center justify-between ${
+                  p2 !== null
+                    ? 'border-[#A7F3D0] bg-[#ECFDF5]/50'
+                    : 'border-slate-200 bg-slate-50/50'
+                }`}
+              >
+                <div>
+                  <div className="text-xs font-bold text-[#0A2540]">Phase 2: Architectural Demo</div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    {p2Eval?.createdAt ? `Evaluated on ${new Date(p2Eval.createdAt).toLocaleDateString()}` : 'Awaiting Review'}
+                  </div>
+                </div>
+                <span className={`font-mono font-bold text-sm ${p2 !== null ? 'text-[#15803D]' : 'text-slate-400'}`}>
+                  {p2 !== null ? `${p2}/100` : '--/100'}
+                </span>
+              </div>
+
+              <div
+                className={`p-3 rounded-lg border flex items-center justify-between ${
+                  p3 !== null
+                    ? 'border-[#A7F3D0] bg-[#ECFDF5]/50'
+                    : 'border-slate-200 bg-slate-50/50'
+                }`}
+              >
+                <div>
+                  <div className="text-xs font-bold text-[#0A2540]">Phase 3: Final Defense</div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    {p3Eval?.createdAt ? `Evaluated on ${new Date(p3Eval.createdAt).toLocaleDateString()}` : 'Semester End'}
+                  </div>
+                </div>
+                <span className={`font-mono font-semibold text-xs ${p3 !== null ? 'text-[#15803D]' : 'text-slate-400'}`}>
+                  {p3 !== null ? `${p3}/60` : 'Pending / 60'}
+                </span>
+              </div>
+            </div>
           </div>
-        </AppCard>
+
+          {/* Team Roster & Members */}
+          <div className="surface-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-[#0A2540]">Team Roster</h3>
+                <p className="text-xs text-slate-500">{members.length} active engineering members</p>
+              </div>
+              {!isLeader && (
+                <button
+                  onClick={() => setIsLeaveModalOpen(true)}
+                  className="text-xs font-semibold text-[#BE123C] hover:underline"
+                >
+                  Leave Team
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2.5">
+              {members.length === 0 ? (
+                <div className="p-4 rounded-xl border border-[#D6E4EE] text-center text-xs text-slate-400">
+                  No teammates joined yet. Share your team code to recruit members!
+                </div>
+              ) : (
+                members.map((m) => {
+                  const isMemberLead = team?.leaderId === m.id || m.role === 'TEAM_LEAD';
+                  return (
+                    <div
+                      key={m.id}
+                      className="p-3 rounded-xl border border-[#D6E4EE] bg-white flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-[#0F4C81] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                          {m.fullName.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-[#0A2540] truncate">{m.fullName}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">
+                            {m.usn || m.email || 'Student'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isMemberLead ? (
+                          <span className="px-2 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] text-[10px] font-bold font-mono">
+                            LEAD
+                          </span>
+                        ) : (
+                          <>
+                            <span className="px-2 py-0.5 rounded bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0] text-[10px] font-bold font-mono">
+                              MEMBER
+                            </span>
+                            {isLeader && (
+                              <button
+                                onClick={() => {
+                                  setSelectedMemberForTransfer(m.id);
+                                  setIsTransferModalOpen(true);
+                                }}
+                                className="h-6 px-2 rounded border border-[#D6E4EE] bg-white hover:bg-slate-50 text-[10.5px] font-semibold text-slate-600 transition-colors"
+                              >
+                                Make Lead
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Departed Members */}
+            {departures.length > 0 && <DepartedMembersSection departures={departures} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Abstract Modal */}
+      {isEditAbstractOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-lg w-full overflow-hidden shadow-modal">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-bold text-[#0A2540]">Edit Project Abstract</h3>
+              <button onClick={() => setIsEditAbstractOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              <textarea
+                rows={6}
+                value={abstractDraft}
+                onChange={(e) => setAbstractDraft(e.target.value)}
+                placeholder="Enter refined problem formulation, dataset characteristics, and algorithmic scope..."
+                className="w-full p-3 rounded-lg border border-[#D6E4EE] bg-white text-xs text-[#0A2540] outline-none focus:border-[#1D63ED] leading-relaxed"
+              />
+            </div>
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2.5">
+              <button
+                onClick={() => setIsEditAbstractOpen(false)}
+                className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={savingAbstract}
+                onClick={handleSaveAbstract}
+                className="h-8 px-4 rounded-lg bg-[#1D63ED] text-white text-xs font-semibold hover:bg-[#1752C9] disabled:opacity-50"
+              >
+                {savingAbstract ? 'Saving...' : 'Save Abstract'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* 6. Leave Team Section */}
-      <AppCard
-        title="Team Governance Actions"
-        accent={false}
-        style={{ border: '1px solid rgba(179, 79, 92, 0.35)', background: '#FFF9F9' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#B34F5C' }}>Leave Project Team</div>
-            <div style={{ fontSize: 12, color: '#70899A', marginTop: 2 }}>
-              Leaves your current team and marks your contributions as removed per academic governance.
+      {/* PDF Report Viewer Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-lg w-full overflow-hidden shadow-modal">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#1D63ED]" />
+                <h3 className="text-sm font-bold text-[#0A2540]">{previewDoc.title}</h3>
+              </div>
+              <button onClick={() => setPreviewDoc(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-5 space-y-3 text-center">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#1D63ED] flex items-center justify-center mx-auto mb-2">
+                <FileText className="w-6 h-6" />
+              </div>
+              <p className="text-xs font-mono font-bold text-slate-800">{previewDoc.fileName}</p>
+              <p className="text-xs text-slate-500">
+                Uploaded for {previewDoc.phase} on {previewDoc.date}. Verified by Faculty Mentor.
+              </p>
+            </div>
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2.5">
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="h-8 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-slate-600"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setPreviewDoc(null);
+                  showToast(`Downloading ${previewDoc.fileName}...`, 'success');
+                }}
+                className="h-8 px-4 rounded-lg bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF</span>
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => setIsLeaveModalOpen(true)}
-            className="btn btn-danger"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <LogOut size={15} /> Leave Team
-          </button>
         </div>
-      </AppCard>
+      )}
 
-      {/* Edit Project Info Modal */}
-      <Modal
-        isOpen={isEditProjectOpen}
-        onClose={() => setIsEditProjectOpen(false)}
-        title="Edit Project Specifications"
-        subtitle="Update project title, gist, abstract, and milestone objectives."
-        maxWidth={620}
-      >
-        <form onSubmit={handleUpdateProject}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-proj-title">Project Title</label>
-            <input
-              id="edit-proj-title"
-              type="text"
-              required
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="form-input"
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-proj-gist">Project Gist (Short Pitch)</label>
-            <textarea
-              id="edit-proj-gist"
-              required
-              value={editGist}
-              onChange={(e) => setEditGist(e.target.value)}
-              className="form-textarea"
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-proj-theme">Theme / Domain</label>
-              <input
-                id="edit-proj-theme"
-                type="text"
-                required
-                value={editTheme}
-                onChange={(e) => setEditTheme(e.target.value)}
-                className="form-input"
-              />
+      {/* Leave Team Confirmation Modal */}
+      {isLeaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-md w-full overflow-hidden shadow-modal p-5 space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-rose-50 text-[#DC2626] border border-rose-200 text-[11px] font-bold">
+              Confirm Action
             </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-proj-branch">Department Branch</label>
-              <input
-                id="edit-proj-branch"
-                type="text"
-                required
-                value={editBranch}
-                onChange={(e) => setEditBranch(e.target.value)}
-                className="form-input"
-              />
+            <h3 className="text-base font-bold text-[#0A2540]">
+              Leave {team?.teamName || 'Team'}?
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Leaving this team will revoke your access to shared project deliverables and future milestone evaluations under <strong>{mentor?.fullName || 'Faculty Mentor'}</strong>. Your verified contributions remain archived in the cohort audit log.
+            </p>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setIsLeaveModalOpen(false)}
+                className="h-8 px-3 rounded-lg border border-[#D6E4EE] text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Stay in Team
+              </button>
+              <button
+                onClick={handleLeaveTeam}
+                className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-red-700 text-white text-xs font-semibold transition-colors"
+              >
+                Confirm Leave
+              </button>
             </div>
           </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-proj-abstract">Formal Abstract</label>
-            <textarea
-              id="edit-proj-abstract"
-              value={editAbstract}
-              onChange={(e) => setEditAbstract(e.target.value)}
-              className="form-textarea"
-              placeholder="Detailed technical abstract of the project..."
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-proj-objectives">Milestone Objectives</label>
-            <textarea
-              id="edit-proj-objectives"
-              value={editObjectives}
-              onChange={(e) => setEditObjectives(e.target.value)}
-              className="form-textarea"
-              placeholder="Key project deliverables and objectives..."
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-            <button type="button" onClick={() => setIsEditProjectOpen(false)} className="btn">
-              Cancel
-            </button>
-            <button type="submit" disabled={editLoading} className="btn btn-primary">
-              {editLoading ? 'Saving...' : 'Update Specifications ↗'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Leave Team Modal */}
-      <Modal
-        isOpen={isLeaveModalOpen}
-        onClose={() => setIsLeaveModalOpen(false)}
-        title="Leave Project Team?"
-        subtitle="Please review academic governance consequences."
-      >
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 20 }}>
-          <AlertTriangle size={36} color="#B34F5C" style={{ flexShrink: 0 }} />
-          <div style={{ fontSize: 13, color: '#102F48', lineHeight: 1.5 }}>
-            {isLeader ? (
-              <span>
-                <strong>You are currently the Team Lead.</strong> You should transfer leadership to
-                another member before leaving, otherwise the team will remain leaderless. Leaving
-                will delete all your submitted contributions.
-              </span>
-            ) : (
-              <span>
-                Are you sure you want to leave <strong>{team?.teamName}</strong>? All your submitted
-                contributions and proof files will be purged from storage, and your departure will be
-                logged in the team ledger.
-              </span>
-            )}
-          </div>
         </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="btn">
-            Cancel
-          </button>
-          <button type="button" onClick={handleLeaveTeam} className="btn btn-danger">
-            Confirm Leave Team
-          </button>
-        </div>
-      </Modal>
-
-      {/* Transfer Leadership Modal */}
-      <Modal
-        isOpen={isTransferModalOpen}
-        onClose={() => setIsTransferModalOpen(false)}
-        title="Transfer Team Leadership"
-        subtitle="Nominate a teammate to take over leadership responsibilities."
-      >
-        <div className="form-group">
-          <label className="form-label" htmlFor="select-new-lead">Select New Team Lead</label>
-          <select
-            id="select-new-lead"
-            value={selectedMemberForTransfer}
-            onChange={(e) => setSelectedMemberForTransfer(e.target.value)}
-            className="form-select"
-          >
-            <option value="">Choose a member...</option>
-            {members
-              .filter((m) => m.id !== user?.id)
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.fullName} ({m.usn || m.email})
-                </option>
-              ))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-          <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn">
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!selectedMemberForTransfer}
-            onClick={handleTransferLeadership}
-            className="btn btn-primary"
-          >
-            Send Transfer Request ↗
-          </button>
-        </div>
-      </Modal>
+      )}
     </div>
   );
 };

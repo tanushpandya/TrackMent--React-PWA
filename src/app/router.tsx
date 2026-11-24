@@ -45,14 +45,16 @@ const BrowseTeamsScreen = lazy(() => import('../features/team-formation/BrowseTe
 const BrowseStudentsScreen = lazy(() => import('../features/team-formation/BrowseStudentsScreen').then(m => ({ default: m.BrowseStudentsScreen })));
 const TeamInvitationsModal = lazy(() => import('../features/team-formation/TeamInvitationsModal').then(m => ({ default: m.TeamInvitationsModal })));
 
-// Docs
+// Docs & Public Experience
+const HomeScreen = lazy(() => import('../features/home/HomeScreen').then(m => ({ default: m.HomeScreen })));
+const TermsScreen = lazy(() => import('../features/legal/TermsScreen').then(m => ({ default: m.TermsScreen })));
 const UserManualScreen = lazy(() => import('../features/docs/UserManualScreen').then(m => ({ default: m.UserManualScreen })));
 
 /** Root redirect helper based on role */
 const RootRedirect: React.FC = () => {
   const { status, user, profile, isMentor, isLead } = useAuth();
   if (status === 'loading') return null;
-  if (status === 'guest' || !user) return <Navigate to="/login" replace />;
+  if (status === 'guest' || !user) return <Navigate to="/home" replace />;
   if (status === 'newUser') {
     const detected = AuthService.detectEmailRole(user?.email);
     return <Navigate to={detected === 'MENTOR' ? '/profile/faculty' : '/profile/student'} replace />;
@@ -156,7 +158,23 @@ export const router = createBrowserRouter([
     element: <RootRedirect />,
   },
 
-  // Auth (Public / Onboarding)
+  // Public Experience & Auth
+  {
+    path: '/home',
+    element: (
+      <Suspense fallback={<RouteLoadingSpinner />}>
+        <HomeScreen />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/terms',
+    element: (
+      <Suspense fallback={<RouteLoadingSpinner />}>
+        <TermsScreen />
+      </Suspense>
+    ),
+  },
   {
     path: '/login',
     element: <LoginScreen />,

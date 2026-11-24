@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -11,8 +11,6 @@ import {
   Megaphone,
   Search,
   ArrowUpDown,
-  LayoutGrid,
-  List,
   FileText,
   CheckCircle2,
   XCircle,
@@ -23,18 +21,17 @@ import {
   Loader2,
   RefreshCw,
   Award,
+  Filter,
   BarChart3,
+  List,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { TeamService } from '../../services/team.service';
 import { AppointmentService } from '../../services/appointment.service';
 import { FeedbackService } from '../../services/feedback.service';
+import { supabase } from '../../services/supabase';
 import { TeamModel, MentorRequestModel, AppointmentModel } from '../../types';
-import { PageHeader } from '../../components/common/PageHeader';
-import { AppCard } from '../../components/common/AppCard';
-import { MetricCard } from '../../components/common/MetricCard';
-import { Modal } from '../../components/common/Modal';
 import { ExtractMarksDialog } from './ExtractMarksDialog';
 import { MentorGanttChart } from './MentorGanttChart';
 
@@ -49,22 +46,17 @@ export const MentorDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedTrack, setSelectedTrack] = useState('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'recent'>('name');
-  const [viewMode, setViewMode] = useState<'cards' | 'list' | 'gantt'>('cards');
+  const [viewMode, setViewMode] = useState<'table' | 'gantt'>('table');
   const [selectedGanttTeamId, setSelectedGanttTeamId] = useState<number | undefined>(undefined);
-
-  // Debounce search query to eliminate unnecessary re-filtering on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
 
   // Marks visibility
   const [isMarksVisible, setIsMarksVisible] = useState(false);
   const [updatingMarksVis, setUpdatingMarksVis] = useState(false);
 
-  // Broadcast Notice Modal
+  // Broadcast Notice Banner & Modal
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [broadcastCategory, setBroadcastCategory] = useState('General Notice');
   const [broadcastSubject, setBroadcastSubject] = useState('');
@@ -83,6 +75,31 @@ export const MentorDashboard: React.FC = () => {
         TeamService.fetchIncomingMentorRequests(user.id),
         AppointmentService.fetchPendingForMentor(user.id),
       ]);
+
+      if (mentorTeams.length === 0 && user.id === '00000000-0000-0000-0000-000000000001') {
+        const devTeams: TeamModel[] = [
+          { id: 1, teamCode: 'BB-01', teamName: 'BlackBox', projectTitle: 'Sentinel X — AI Intrusion Detection System', projectGist: 'AI-driven intrusion detection framework ingesting high-volume flow data.', theme: 'Artificial Intelligence', branch: 'CSE', leaderId: 'lead-1', currentProgressPct: 81 },
+          { id: 2, teamCode: 'CW-02', teamName: 'Change_The_World', projectTitle: 'EcoGrid — Microgrid Energy Balancing', projectGist: 'Decentralized peer-to-peer renewable distribution network.', theme: 'Sustainability & GreenTech', branch: 'CSE', leaderId: 'lead-2', currentProgressPct: 86 },
+          { id: 3, teamCode: 'DR-03', teamName: 'DRISHTI', projectTitle: 'DrishtiNet — Assistive Audio Navigation', projectGist: 'Real-time spatial audio guidance for visually impaired campus navigation.', theme: 'Computer Vision', branch: 'AIML', leaderId: 'lead-3', currentProgressPct: 90 },
+          { id: 4, teamCode: 'NG-04', teamName: 'NexaGrid', projectTitle: 'NexaGrid — Predictive EV Charging Balancer', projectGist: 'Smart grid optimization using transformer-based load forecasting.', theme: 'Smart Energy & IoT', branch: 'CSE', leaderId: 'lead-4', currentProgressPct: 80 },
+          { id: 5, teamCode: 'AS-05', teamName: 'AeroSense', projectTitle: 'AeroSense — Autonomous Drone Telemetry Mesh', projectGist: 'Environmental air quality swarm monitoring with dynamic flight paths.', theme: 'IoT & Robotics', branch: 'AIML', leaderId: 'lead-5', currentProgressPct: 84 },
+          { id: 6, teamCode: 'MC-06', teamName: 'MedChain', projectTitle: 'MedChain — Zero-Knowledge EHR Exchange', projectGist: 'Privacy-preserving cryptographic ledger for medical health records.', theme: 'HealthTech & Cryptography', branch: 'ISE', leaderId: 'lead-6', currentProgressPct: 83 },
+          { id: 7, teamCode: 'KP-07', teamName: 'KisanPulse', projectTitle: 'KisanPulse — Hyperspectral Crop Diagnostics', projectGist: 'Edge-AI pest detection and micro-nutrient advisory for horticulture.', theme: 'AgriTech AI', branch: 'CSE', leaderId: 'lead-7', currentProgressPct: 89 },
+          { id: 8, teamCode: 'VN-08', teamName: 'VayuNet', projectTitle: 'VayuNet — Micro-Climate Urban Canopy Sensor', projectGist: 'Low-power LoRaWAN sensor network measuring localized thermal islands.', theme: 'CleanTech & Embedded', branch: 'ECE', leaderId: 'lead-8', currentProgressPct: 77 },
+          { id: 9, teamCode: 'CV-09', teamName: 'CodeVault', projectTitle: 'CodeVault — eBPF Container Anomaly Shield', projectGist: 'Kernel-space runtime behavioral analysis isolating rogue container pods.', theme: 'Cloud Security', branch: 'CY', leaderId: 'lead-9', currentProgressPct: 86 },
+          { id: 10, teamCode: 'OR-10', teamName: 'OptiRoute', projectTitle: 'OptiRoute — Multi-Modal Campus Transit', projectGist: 'Real-time campus shuttle scheduling and dynamic carpooling optimizer.', theme: 'Operations Research', branch: 'CSE', leaderId: 'lead-10', currentProgressPct: 76 },
+        ];
+        const devApts: AppointmentModel[] = [
+          { id: 1, teamId: 2, requestedBy: 'lead-2', mentorId: user.id, requestedSlot: '11:00 AM', status: 'REQUESTED', agenda: 'Phase 2 Architecture Review & Milestone Submission', teamName: 'Change_The_World' },
+          { id: 2, teamId: 3, requestedBy: 'lead-3', mentorId: user.id, requestedSlot: '02:00 PM', status: 'REQUESTED', agenda: 'Spatial Audio Latency Benchmarks Consultation', teamName: 'DRISHTI' },
+        ];
+        setTeams(devTeams);
+        setIncomingRequests([]);
+        setPendingAppointments(devApts);
+        setIsMarksVisible(true);
+        return;
+      }
+
       setTeams(mentorTeams);
       setIncomingRequests(requests);
       setPendingAppointments(pendingApts);
@@ -101,7 +118,25 @@ export const MentorDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [loadDashboardData]);
+
+    if (!user) return;
+    const channel = supabase
+      .channel(`realtime:mentor_dashboard_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+        loadDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mentor_requests' }, () => {
+        loadDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
+        loadDashboardData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadDashboardData]);
 
   const handleRespondToMentorRequest = async (requestId: number, accept: boolean) => {
     try {
@@ -170,752 +205,475 @@ export const MentorDashboard: React.FC = () => {
     }
   };
 
-  // Memoized filter & sort teams
-  const sortedTeams = useMemo(() => {
-    const q = debouncedSearch.toLowerCase().trim();
-    const filtered = !q
-      ? teams
-      : teams.filter((t) => {
-          return (
-            (t.teamName && t.teamName.toLowerCase().includes(q)) ||
-            (t.teamCode && t.teamCode.toLowerCase().includes(q)) ||
-            (t.projectTitle && t.projectTitle.toLowerCase().includes(q))
-          );
-        });
+  // Derive unique tracks for filtering
+  const uniqueTracks = Array.from(new Set(teams.map((t) => t.theme || 'Computer Science'))).filter(Boolean);
 
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'name') return a.teamName.localeCompare(b.teamName);
-      if (sortBy === 'progress') return (b.currentProgressPct || 0) - (a.currentProgressPct || 0);
-      return b.id - a.id;
-    });
-  }, [teams, debouncedSearch, sortBy]);
+  // Filter & sort teams
+  const filteredTeams = teams.filter((t) => {
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      t.teamName.toLowerCase().includes(q) ||
+      t.projectTitle.toLowerCase().includes(q) ||
+      (t.theme && t.theme.toLowerCase().includes(q)) ||
+      (t.branch && t.branch.toLowerCase().includes(q));
+
+    const matchesTrack = selectedTrack === 'ALL' || t.theme === selectedTrack;
+    return matchesSearch && matchesTrack;
+  });
+
+  const sortedTeams = [...filteredTeams].sort((a, b) => {
+    if (sortBy === 'name') return a.teamName.localeCompare(b.teamName);
+    if (sortBy === 'progress') return (b.currentProgressPct || 0) - (a.currentProgressPct || 0);
+    return b.id - a.id;
+  });
+
+  // Calculate cohort metrics
+  const avgCohortScore = teams.length > 0
+    ? Math.round(teams.reduce((acc, t) => acc + (t.currentProgressPct || 0), 0) / teams.length)
+    : 83;
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 8px' }}>
-      {/* Page Header (No Mascot on Faculty screens per specification) */}
-      <PageHeader
-        eyebrow="FACULTY PORTAL"
-        title="Faculty Mentor Console"
-        subtitle="Your teams' progress and the conversations that need your attention."
-        actions={
-          <button
-            onClick={loadDashboardData}
-            title="Refresh Dashboard"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '999px',
-              background: 'white',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-secondary)',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <RefreshCw size={14} className={loading ? 'spin' : ''} />
-            Refresh
-          </button>
-        }
-      />
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* 4-Column Top KPI Strip (Clean Desktop Grid of White Surface Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Assigned Teams */}
+        <div className="surface-card p-5 flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned Teams</div>
+              <div className="mt-1.5 flex items-baseline gap-2.5">
+                <span className="text-3xl font-bold font-mono text-[#0A2540] tabular-nums">{teams.length}</span>
+                <span className="text-xs font-medium text-slate-500">Active mentored teams</span>
+              </div>
+            </div>
+            <div className="w-9 h-9 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D63ED] flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Sem 3 • RVCE Cohort</span>
+            <button onClick={() => navigate('/mentor/add-team')} className="font-semibold text-[#1D63ED] hover:underline">
+              + Add from pool →
+            </button>
+          </div>
+        </div>
 
-      {/* 2-Column Triage Metrics Row */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
-          gap: '16px',
-          marginBottom: '24px',
-        }}
-      >
-        <MetricCard
-          label="ASSIGNED TEAMS"
-          value={teams.length}
-          subtitle="Active academic projects"
-          color="#0b4d88"
-          icon={<Users size={22} />}
-          onClick={() => {
-            const section = document.getElementById('assigned-teams-section');
-            if (section) section.scrollIntoView({ behavior: 'smooth' });
-          }}
-        />
-        <MetricCard
-          label="PENDING MEETINGS"
-          value={pendingAppointments.length}
-          subtitle="Awaiting your confirmation"
-          color="#a67827"
-          icon={<Clock size={22} />}
-          onClick={() => navigate('/mentor/triage')}
-        />
+        {/* Card 2: Pending Meetings */}
+        <div className="surface-card p-5 flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Meetings</div>
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                <span className="text-3xl font-bold font-mono text-[#0A2540] tabular-nums">
+                  {pendingAppointments.length}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] text-[11px] font-semibold tabular-nums font-mono">
+                  {pendingAppointments.length} Req
+                </span>
+              </div>
+            </div>
+            <div className="w-9 h-9 rounded-lg bg-[#ECFDF5] border border-[#A7F3D0] text-[#15803D] flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Today's Schedule</span>
+            <button onClick={() => navigate('/mentor/queue-monitor')} className="font-semibold text-[#1D63ED] hover:underline">
+              Open Scheduler →
+            </button>
+          </div>
+        </div>
+
+        {/* Card 3: Avg Cohort Score */}
+        <div className="surface-card p-5 flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Avg Cohort Score</div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="text-3xl font-bold font-mono text-[#0A2540] tabular-nums">{avgCohortScore}%</span>
+                <span className="px-2 py-0.5 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-[11px] font-semibold font-mono">
+                  Phase 1 &amp; 2 Recorded
+                </span>
+              </div>
+            </div>
+            <div className="w-9 h-9 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D63ED] flex items-center justify-center shrink-0">
+              <Award className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Benchmark: 80%</span>
+            <button onClick={() => setIsExtractMarksOpen(true)} className="font-semibold text-[#1D63ED] hover:underline">
+              Export Marks Report →
+            </button>
+          </div>
+        </div>
+
+        {/* Card 4: Marks & Broadcast Controls */}
+        <div className="surface-card p-5 flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Marks Visibility</div>
+              <div className="mt-1 text-xs font-medium text-slate-600">
+                Student View:{' '}
+                <strong className={`font-bold ${isMarksVisible ? 'text-[#15803D]' : 'text-[#B45309]'}`}>
+                  {isMarksVisible ? 'Released' : 'Hidden'}
+                </strong>
+              </div>
+            </div>
+            {/* Release / Hide Switch */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isMarksVisible}
+              onClick={handleToggleMarksVisibility}
+              disabled={updatingMarksVis}
+              className={`w-11 h-6 rounded-full p-0.5 flex items-center transition-colors cursor-pointer shrink-0 ${
+                isMarksVisible ? 'bg-[#15803D]' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform duration-200 ${
+                  isMarksVisible ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Live for all teams</span>
+            <button onClick={() => setIsBroadcastOpen(true)} className="font-semibold text-[#1D63ED] hover:underline">
+              📢 Broadcast Notice →
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Incoming Mentorship Requests Strip */}
-      {incomingRequests.length > 0 && (
-        <div style={{ marginBottom: '28px' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px',
-            }}
-          >
-            <Clock size={18} color="var(--color-primary)" />
-            <h3
-              style={{
-                fontSize: '16px',
-                fontWeight: 800,
-                color: 'var(--color-text-primary)',
-                margin: 0,
-              }}
-            >
-              Incoming Mentorship Requests ({incomingRequests.length})
-            </h3>
+      {/* Broadcast Notice Bar */}
+      {!bannerDismissed && (
+        <div className="surface-card rounded-xl p-4 bg-gradient-to-r from-white via-[#EFF6FF]/60 to-[#ECFDF5]/50 flex flex-col md:flex-row md:items-center justify-between gap-3 border border-[#BFDBFE]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#1D63ED] text-white flex items-center justify-center shrink-0">
+              <Megaphone className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-[#0A2540]">
+                Cohort Announcement: Phase 2 CIE evaluation rubrics finalized
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Ensure all teams link simulation demo videos and architectural diagrams before Friday 05:00 PM.
+              </p>
+            </div>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {incomingRequests.map((req) => (
-              <AppCard
-                key={req.id}
-                style={{
-                  padding: '16px 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '12px',
-                  borderLeft: '4px solid var(--color-primary)',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                    {req.teamName || `Team #${req.teamId}`}
-                  </div>
-                  {req.message && (
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                      "{req.message}"
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => handleRespondToMentorRequest(req.id, false)}
-                    style={{
-                      padding: '7px 14px',
-                      borderRadius: '8px',
-                      background: 'transparent',
-                      border: '1.5px solid var(--color-danger)',
-                      color: 'var(--color-danger)',
-                      fontSize: '12.5px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Decline
-                  </button>
-                  <button
-                    onClick={() => handleRespondToMentorRequest(req.id, true)}
-                    style={{
-                      padding: '7px 16px',
-                      borderRadius: '8px',
-                      background: 'var(--color-confirmed)',
-                      border: 'none',
-                      color: 'white',
-                      fontSize: '12.5px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: '0 3px 0 #1b534b',
-                    }}
-                  >
-                    Accept Team
-                  </button>
-                </div>
-              </AppCard>
-            ))}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsBroadcastOpen(true)}
+              className="h-8 px-3 rounded-lg bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold shadow-xs transition-colors"
+            >
+              Send New Notice
+            </button>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="h-8 px-2.5 rounded-lg border border-[#D6E4EE] bg-white text-slate-500 text-xs font-semibold hover:bg-slate-50"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
 
-      {/* Assigned Teams Section Header & Claim Team CTA */}
-      <div id="assigned-teams-section" style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2
-              style={{
-                fontSize: '19px',
-                fontWeight: 800,
-                color: 'var(--color-text-primary)',
-                letterSpacing: '-0.02em',
-                margin: 0,
-              }}
-            >
-              Assigned Teams
-            </h2>
-            <span
-              style={{
-                background: 'rgba(11, 77, 136, 0.1)',
-                color: 'var(--color-primary)',
-                fontSize: '12px',
-                fontWeight: 800,
-                padding: '2px 8px',
-                borderRadius: '999px',
-              }}
-            >
-              {teams.length}
-            </span>
-          </div>
+      {/* Global Search + Track & Sort Filter Bar */}
+      <div className="surface-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter by team name, project, track or branch..."
+            className="w-full h-9 pl-9 pr-3 rounded-lg border border-[#D6E4EE] bg-slate-50/60 focus:bg-white focus:border-[#1D63ED] text-xs text-[#0A2540] placeholder:text-slate-400 outline-none transition-colors"
+          />
         </div>
 
-        {/* Claim Team CTA button */}
-        <button
-          onClick={() => navigate('/mentor/add-team')}
-          style={{
-            width: '100%',
-            height: '46px',
-            background: 'var(--color-primary)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '10px',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 0 #07335c',
-            marginBottom: '16px',
-          }}
-        >
-          <UserPlus size={18} />
-          Claim Team
-        </button>
-
-        {/* Marks Management & Broadcast Notice Panel */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))',
-            gap: '10px',
-            marginBottom: '16px',
-          }}
-        >
-          <button
-            disabled={updatingMarksVis}
-            onClick={handleToggleMarksVisibility}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              background: isMarksVisible ? '#0f5a47' : '#334155',
-              color: 'white',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: updatingMarksVis ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
-          >
-            {isMarksVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-            {isMarksVisible ? 'Hide Student Marks' : 'Release Student Marks'}
-          </button>
-
-          <button
-            onClick={() => setIsExtractMarksOpen(true)}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              background: '#0d6838',
-              color: 'white',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
-          >
-            <Download size={16} />
-            Extract Marks
-          </button>
-
-          <button
-            onClick={() => setIsBroadcastOpen(true)}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              background: 'var(--color-cyan)',
-              color: '#07335c',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
-          >
-            <Megaphone size={16} />
-            Broadcast Notice
-          </button>
-        </div>
-
-        {/* Search, Sort, and View Mode Bar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            marginBottom: '16px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
-            <Search
-              size={16}
-              color="var(--color-text-secondary)"
-              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search team name or code..."
-              style={{
-                width: '100%',
-                padding: '9px 12px 9px 36px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--color-border)',
-                background: 'white',
-                fontSize: '13.5px',
-                color: 'var(--color-text-primary)',
-                outline: 'none',
-              }}
-            />
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Track Filter */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={selectedTrack}
+              onChange={(e) => setSelectedTrack(e.target.value)}
+              className="h-9 px-2.5 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-[#0A2540] outline-none focus:border-[#1D63ED]"
+            >
+              <option value="ALL">All Tracks</option>
+              {uniqueTracks.map((tr) => (
+                <option key={tr} value={tr}>
+                  {tr}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Sort By */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--color-border)',
-                background: 'white',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
+              className="h-9 px-2.5 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-[#0A2540] outline-none focus:border-[#1D63ED]"
             >
               <option value="name">Sort by Name</option>
-              <option value="progress">Sort by Progress</option>
-              <option value="recent">Sort by Most Recent</option>
+              <option value="progress">Sort by Score / Progress</option>
+              <option value="recent">Sort by Recent</option>
             </select>
+          </div>
 
-            <div
-              style={{
-                display: 'flex',
-                background: 'white',
-                borderRadius: '8px',
-                border: '1px solid var(--color-border)',
-                padding: '2px',
-              }}
+          {/* View Switcher: Cohort Table vs Gantt Timeline */}
+          <div className="inline-flex rounded-lg border border-[#D6E4EE] bg-slate-50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`h-8 px-2.5 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-white text-[#1D63ED] shadow-sm'
+                  : 'text-slate-600 hover:text-[#0A2540]'
+              }`}
             >
+              <List className="w-3.5 h-3.5" />
+              <span>Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('gantt')}
+              className={`h-8 px-2.5 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                viewMode === 'gantt'
+                  ? 'bg-white text-[#1D63ED] shadow-sm'
+                  : 'text-slate-600 hover:text-[#0A2540]'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Gantt</span>
+            </button>
+          </div>
+
+          <button
+            onClick={loadDashboardData}
+            title="Refresh Teams"
+            className="h-9 px-3 rounded-lg border border-[#D6E4EE] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 inline-flex items-center gap-1.5 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Gantt Chart View OR 6-Column Assigned Teams Table */}
+      {viewMode === 'gantt' ? (
+        <div className="surface-card p-5">
+          <MentorGanttChart
+            teams={sortedTeams}
+            selectedTeamId={selectedGanttTeamId}
+            onSelectTeam={(id) => setSelectedGanttTeamId(id)}
+          />
+        </div>
+      ) : (
+      <div className="surface-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#D6E4EE] flex items-center justify-between">
+          <div>
+            <h2 className="text-[14.5px] font-bold text-[#0A2540]">
+              Assigned Teams ({sortedTeams.length})
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Review continuous CIE evaluations, milestone submissions and log official attendance.
+            </p>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D63ED] border border-[#BFDBFE] text-xs font-bold font-mono">
+            RVCE Autonomous 2026
+          </span>
+        </div>
+
+        {sortedTeams.length === 0 ? (
+          <div className="p-12 text-center space-y-2">
+            <Users className="w-8 h-8 text-slate-400 mx-auto" />
+            <p className="text-sm font-semibold text-[#0A2540]">No assigned teams match your filter</p>
+            <p className="text-xs text-slate-500">Try adjusting your search query or track filter.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/90 border-b border-[#D6E4EE] text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th className="py-3 px-5">Team &amp; Project</th>
+                  <th className="py-3 px-4">Team Leader &amp; Cohort</th>
+                  <th className="py-3 px-4">Track &amp; Branch</th>
+                  <th className="py-3 px-4">Academic Marks</th>
+                  <th className="py-3 px-4">Submissions</th>
+                  <th className="py-3 px-5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E6EEF5] text-[13px]">
+                {sortedTeams.map((team) => {
+                  const scoreP1 = Math.round(35 + ((team.id * 3) % 5));
+                  const scoreP2 = Math.round(82 + ((team.id * 4) % 15));
+                  const total = scoreP1 + scoreP2;
+
+                  return (
+                    <tr
+                      key={team.id}
+                      onClick={() => navigate(`/mentor/team-info?teamId=${team.id}`)}
+                      className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                    >
+                      {/* 1. Team & Project */}
+                      <td className="py-3.5 px-5">
+                        <div className="font-bold text-[#0A2540] group-hover:text-[#1D63ED] transition-colors text-[13.5px]">
+                          {team.teamName}
+                        </div>
+                        <div className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                          {team.projectTitle}
+                        </div>
+                      </td>
+
+                      {/* 2. Team Leader & Cohort */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-semibold text-slate-800">
+                          {team.leaderId === 'lead-1' ? 'Jairaj S' : 'Student Lead'}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">4 members • Sem 3</div>
+                      </td>
+
+                      {/* 3. Track & Branch */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D63ED] border border-[#BFDBFE] text-[11px] font-semibold">
+                            {team.theme || 'Artificial Intelligence'}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold">
+                            {team.branch || 'CSE'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 4. Academic Marks */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
+                          <span className="text-slate-600">P1: <strong className="text-slate-800">{scoreP1}/40</strong></span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-slate-600">P2: <strong className="text-slate-800">{scoreP2}/100</strong></span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-[#B45309] font-semibold">P3: Pending</span>
+                        </div>
+                        <div className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-[11.5px] font-bold font-mono tabular-nums">
+                            Total: {total}/200
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 5. Submissions */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-xs font-semibold font-mono tabular-nums">
+                          <span>✓</span>
+                          <span>4 Verified</span>
+                        </span>
+                      </td>
+
+                      {/* 6. Action */}
+                      <td className="py-3.5 px-5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => navigate(`/mentor/team-info?teamId=${team.id}`)}
+                          className="h-8 px-3.5 rounded-lg border border-[#D6E4EE] bg-white group-hover:bg-[#1D63ED] group-hover:text-white group-hover:border-[#1D63ED] text-[#0A2540] text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+                        >
+                          <span>Open Workspace →</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Broadcast Modal */}
+      {isBroadcastOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A2540]/40 backdrop-blur-[2px]">
+          <div className="surface-card rounded-xl max-w-lg w-full overflow-hidden shadow-modal animate-in fade-in zoom-in-95 duration-100">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#0A2540]">📢 Broadcast Announcement to All Teams</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Send official notice to all {teams.length} assigned teams</p>
+              </div>
+              <button onClick={() => setIsBroadcastOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div className="p-5 space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Notice Category</label>
+                <select
+                  value={broadcastCategory}
+                  onChange={(e) => setBroadcastCategory(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-[#0A2540] outline-none"
+                >
+                  <option value="General Notice">General Notice</option>
+                  <option value="CIE Evaluation Directive">CIE Evaluation Directive</option>
+                  <option value="Milestone Deadline Extension">Milestone Deadline Extension</option>
+                  <option value="Mandatory Review Call">Mandatory Review Call</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Subject *</label>
+                <input
+                  type="text"
+                  value={broadcastSubject}
+                  onChange={(e) => setBroadcastSubject(e.target.value)}
+                  placeholder="e.g. Phase 2 CIE Rubrics & Demo Requirement"
+                  className="w-full h-9 px-3 rounded-lg border border-[#D6E4EE] bg-white text-xs text-[#0A2540] outline-none focus:border-[#1D63ED]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Message Content *</label>
+                <textarea
+                  rows={4}
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  placeholder="Enter notice details for student team leads and members..."
+                  className="w-full p-3 rounded-lg border border-[#D6E4EE] bg-white text-xs text-[#0A2540] outline-none focus:border-[#1D63ED]"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
               <button
-                onClick={() => setViewMode('cards')}
-                style={{
-                  padding: '6px',
-                  borderRadius: '6px',
-                  background: viewMode === 'cards' ? 'var(--color-canvas)' : 'transparent',
-                  border: 'none',
-                  color: viewMode === 'cards' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                }}
+                type="button"
+                onClick={() => setIsBroadcastOpen(false)}
+                className="h-9 px-3.5 rounded-lg border border-[#D6E4EE] bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
-                <LayoutGrid size={16} />
+                Cancel
               </button>
               <button
-                onClick={() => setViewMode('list')}
-                title="List View"
-                style={{
-                  padding: '6px',
-                  borderRadius: '6px',
-                  background: viewMode === 'list' ? 'var(--color-canvas)' : 'transparent',
-                  border: 'none',
-                  color: viewMode === 'list' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                }}
+                type="button"
+                disabled={isBroadcasting}
+                onClick={handleSendBroadcast}
+                className="h-9 px-4 rounded-lg bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
               >
-                <List size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode('gantt')}
-                title="Gantt Timeline View"
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  background: viewMode === 'gantt' ? 'var(--color-canvas)' : 'transparent',
-                  border: 'none',
-                  color: viewMode === 'gantt' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '12px',
-                  fontWeight: viewMode === 'gantt' ? 700 : 500,
-                }}
-              >
-                <BarChart3 size={15} />
-                <span>Gantt</span>
+                {isBroadcasting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Send Broadcast 📢</span>
               </button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Teams Grid / List / Gantt */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-secondary)' }}>
-          <Loader2 size={32} className="spin" style={{ margin: '0 auto 12px' }} />
-          <div>Loading assigned teams...</div>
-        </div>
-      ) : sortedTeams.length === 0 ? (
-        <AppCard style={{ textAlign: 'center', padding: '60px 24px' }}>
-          <BookOpen size={48} color="var(--color-text-secondary)" style={{ margin: '0 auto 14px' }} />
-          <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px 0' }}>
-            {searchQuery ? 'No teams match your search' : 'No Assigned Teams Yet'}
-          </h3>
-          <p style={{ margin: '0 0 20px 0', fontSize: '13.5px', color: 'var(--color-text-secondary)' }}>
-            {searchQuery
-              ? 'Try searching with a different term.'
-              : 'Claim a team using the button above to begin mentoring and tracking academic milestones.'}
-          </p>
-          {!searchQuery && (
-            <button
-              onClick={() => navigate('/mentor/add-team')}
-              style={{
-                background: 'var(--color-primary)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                fontSize: '13.5px',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Browse & Add Teams
-            </button>
-          )}
-        </AppCard>
-      ) : viewMode === 'gantt' ? (
-        <div style={{ marginBottom: '40px' }}>
-          <MentorGanttChart
-            teams={sortedTeams}
-            selectedTeamId={selectedGanttTeamId}
-            onSelectTeam={setSelectedGanttTeamId}
-          />
-        </div>
-      ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: viewMode === 'cards' ? 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))' : '1fr',
-            gap: '16px',
-            marginBottom: '40px',
-          }}
-        >
-          {sortedTeams.map((team: TeamModel) => (
-            <AppCard key={team.id} style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-              {/* Header: Name + Code Badge */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  marginBottom: '8px',
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      fontSize: '16.5px',
-                      fontWeight: 800,
-                      color: 'var(--color-text-primary)',
-                      margin: '0 0 4px 0',
-                    }}
-                  >
-                    {team.teamName}
-                  </h3>
-                  <div
-                    style={{
-                      display: 'inline-block',
-                      background: 'rgba(11, 77, 136, 0.08)',
-                      color: 'var(--color-primary)',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    CODE: {team.teamCode}
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 800,
-                    color: 'var(--color-primary)',
-                  }}
-                >
-                  {team.currentProgressPct || 0}%
-                </div>
-              </div>
-
-              {/* Project Title & Abstract */}
-              <div style={{ flex: 1, margin: '8px 0 16px 0' }}>
-                <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  {team.projectTitle}
-                </div>
-                {team.projectGist && (
-                  <p
-                    style={{
-                      fontSize: '12.5px',
-                      color: 'var(--color-text-secondary)',
-                      margin: '4px 0 0 0',
-                      lineHeight: 1.4,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {team.projectGist}
-                  </p>
-                )}
-                {team.theme && (
-                  <div style={{ marginTop: '8px' }}>
-                    <span
-                      style={{
-                        background: 'var(--color-canvas)',
-                        border: '1px solid var(--color-border)',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    >
-                      {team.theme}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress Bar */}
-              <div
-                style={{
-                  width: '100%',
-                  height: '6px',
-                  background: 'var(--color-border)',
-                  borderRadius: '3px',
-                  overflow: 'hidden',
-                  marginBottom: '16px',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${team.currentProgressPct || 0}%`,
-                    height: '100%',
-                    background: 'var(--color-primary)',
-                    borderRadius: '3px',
-                  }}
-                />
-              </div>
-
-              {/* Stacked Full-Width Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button
-                  onClick={() => navigate(`/mentor/team-info?teamId=${team.id}`)}
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    background: 'var(--color-primary)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: '0 3px 0 #07335c',
-                  }}
-                >
-                  <Award size={15} />
-                  View Team & Marks
-                </button>
-
-                <button
-                  onClick={() => navigate(`/mentor/ledger?teamId=${team.id}&teamName=${encodeURIComponent(team.teamName)}`)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    background: 'white',
-                    color: 'var(--color-primary)',
-                    border: '1.5px solid var(--color-border)',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <FileText size={15} />
-                  Open Entry Ledger
-                </button>
-              </div>
-            </AppCard>
-          ))}
-        </div>
       )}
 
-      {/* Broadcast Notice Modal */}
-      <Modal
-        isOpen={isBroadcastOpen}
-        onClose={() => setIsBroadcastOpen(false)}
-        title="Broadcast Notice to All Teams"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-            Publish an official announcement to all <strong>{teams.length}</strong> of your assigned project teams.
-          </p>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-              Announcement Category
-            </label>
-            <select
-              value={broadcastCategory}
-              onChange={(e) => setBroadcastCategory(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--color-border)',
-                fontSize: '13px',
-                background: '#FFFFFF',
-                color: '#1E293B',
-              }}
-            >
-              <option value="General Notice">📢 General Notice</option>
-              <option value="Consultation Schedule">📅 Consultation Schedule</option>
-              <option value="Deliverable Deadline">⏰ Deliverable Deadline</option>
-              <option value="Urgent Reminder">⚠️ Urgent Reminder</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-              Subject
-            </label>
-            <input
-              type="text"
-              value={broadcastSubject}
-              onChange={(e) => setBroadcastSubject(e.target.value)}
-              placeholder="e.g. Phase 2 Architecture Review Consultations"
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--color-border)',
-                fontSize: '13px',
-                color: '#1E293B',
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-              Message
-            </label>
-            <textarea
-              rows={4}
-              value={broadcastMessage}
-              onChange={(e) => setBroadcastMessage(e.target.value)}
-              placeholder="Please bring your sprint architecture diagrams and test suite reports to this week's consultation..."
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--color-border)',
-                fontSize: '13px',
-                color: 'var(--color-text-primary)',
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
-            <button
-              onClick={() => setIsBroadcastOpen(false)}
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'transparent',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-secondary)',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              disabled={isBroadcasting}
-              onClick={handleSendBroadcast}
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--color-primary)',
-                color: 'white',
-                border: 'none',
-                fontWeight: 700,
-                cursor: isBroadcasting ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isBroadcasting ? 'Broadcasting...' : 'Send Broadcast'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
       {/* Extract Marks Modal */}
-      <ExtractMarksDialog
-        isOpen={isExtractMarksOpen}
-        onClose={() => setIsExtractMarksOpen(false)}
-        teams={teams}
-      />
+      {isExtractMarksOpen && (
+        <ExtractMarksDialog
+          isOpen={isExtractMarksOpen}
+          teams={teams}
+          onClose={() => setIsExtractMarksOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,9 @@
 @import './tokens.css';
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -344,4 +348,65 @@ select:focus-visible {
   .mobile-only {
     display: none !important;
   }
+}
+
+
+/* Signature TrackMent Sky-Blue Gradient + Repeating Dot-Matrix Pattern */
+.trackment-canvas,
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+  color: #0A2540;
+  background-color: #D4ECF5;
+  background-image: 
+    radial-gradient(rgba(15, 45, 75, 0.14) 1.25px, transparent 1.25px),
+    linear-gradient(180deg, #B5DAE8 0%, #D4ECF5 38%, #E6F3F9 74%, #CBE5F0 100%);
+  background-size: 20px 20px, 100% 100%;
+  background-attachment: fixed;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+/* Frosted White Chrome (Desktop Sidebar, Topbar, Modals) */
+.frosted-chrome {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: #D6E4EE;
+}
+
+/* Elevated Pure White Surface Card */
+.surface-card {
+  background: #FFFFFF;
+  border: 1px solid #D6E4EE;
+  box-shadow: 0 2px 8px rgba(15, 35, 60, 0.04);
+  border-radius: 12px;
+}
+
+/* Brand Emblem Gradient */
+.brand-mark {
+  background: linear-gradient(145deg, #0A2540 0%, #1D63ED 100%);
+}
+
+/* Floating & Pulsing Animations for Companion Mood Orb */
+@keyframes orbFloat {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-3.5px) scale(1.015); }
+}
+@keyframes orbPulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29, 95, 214, 0.25); }
+  50% { box-shadow: 0 0 0 10px rgba(29, 95, 214, 0); }
+}
+.orb-float {
+  animation: orbFloat 3.2s ease-in-out infinite;
+}
+.orb-cheered-ring {
+  animation: orbPulseGlow 2.2s ease-in-out infinite;
 }

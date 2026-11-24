@@ -18,10 +18,10 @@ export const MobileTabs: React.FC = () => {
     }
     if (isLead) {
       return [
-        { label: 'Overview', to: '/lead/dashboard', icon: Home },
+        { label: 'Dashboard', to: '/student/dashboard', icon: Home },
         { label: 'Review', to: '/lead/review', icon: CheckCircle },
-        { label: 'Progress', to: '/lead/progress', icon: TrendingUp },
-        { label: 'Meetings', to: '/lead/meeting', icon: Calendar },
+        { label: 'Team', to: '/student/team-info', icon: Users },
+        { label: 'Meetings', to: '/student/meeting', icon: Calendar },
         { label: 'Profile', to: '/profile/edit', icon: User },
       ];
     }

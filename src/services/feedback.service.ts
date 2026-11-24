@@ -39,6 +39,25 @@ export class FeedbackService {
     return this.submit(params);
   }
 
+  static async createFeedback(params: {
+    teamId: number;
+    mentorId: string;
+    comment?: string;
+    content?: string | null;
+    directiveType?: string;
+    feedbackType?: FeedbackType;
+    sendEmailNotification?: boolean;
+  }): Promise<FeedbackModel> {
+    const fType = (params.feedbackType || (params.directiveType === 'MEET_ME' ? 'MEET_ME' : 'COMMENT')) as FeedbackType;
+    return this.submit({
+      teamId: params.teamId,
+      mentorId: params.mentorId,
+      feedbackType: fType,
+      content: params.comment || params.content || null,
+      sendEmailNotification: params.sendEmailNotification,
+    });
+  }
+
   static async toggleContributionThumbsUp(params: {
     teamId: number;
     mentorId: string;

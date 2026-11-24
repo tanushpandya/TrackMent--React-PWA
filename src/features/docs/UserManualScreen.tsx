@@ -18,7 +18,54 @@ import { AppCard } from '../../components/common/AppCard';
 
 export const UserManualScreen: React.FC = () => {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<'overview' | 'rubrics' | 'leads' | 'reports' | 'faq'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'rubrics' | 'leads' | 'reports' | 'faq' | 'troubleshooter'>('overview');
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [selectedSymptom, setSelectedSymptom] = useState<string>('login');
+
+  const checklistSteps = [
+    { id: 'c1', text: 'Sign in using your official @rvce.edu.in institutional email' },
+    { id: 'c2', text: 'Complete your Student or Faculty profile with USN / Department' },
+    { id: 'c3', text: 'Create or join a project team and confirm your Team Lead' },
+    { id: 'c4', text: 'Submit your first contribution with proof links or PDF attachment' },
+    { id: 'c5', text: 'Verify your Phase 1, 2 & 3 objectives and consultation ledger' },
+  ];
+
+  const troubleshooterGuides: Record<string, { title: string; steps: string[] }> = {
+    login: {
+      title: 'Cannot sign in or stuck on Login screen',
+      steps: [
+        'Ensure you are using an active @rvce.edu.in email address (personal Gmail accounts are blocked).',
+        'If using Google OAuth, allow popups/redirects and refresh once if the callback hash stalls.',
+        'Clear site data for localhost / trackment if an old session token expired.',
+      ],
+    },
+    pdf: {
+      title: 'PDF report will not preview or download',
+      steps: [
+        'TrackMent opens PDFs inside the Secure In-App Viewer using an isolated Blob URL.',
+        'Ensure the uploaded file is a valid .pdf under the maximum size limit.',
+        'Click "Download PDF" in the viewer header to save it as <team_name>_<submission_number>.pdf.',
+      ],
+    },
+    marks: {
+      title: 'CIE Academic Marks are not visible on dashboard',
+      steps: [
+        'Faculty mentors control the Marks Visibility toggle on the Mentor Dashboard.',
+        'Ask your mentor to switch Marks Visibility to "Released" after grading Phase 1 / Phase 2.',
+        'Individual scores are isolated — you will only see your own rubric breakdown.',
+      ],
+    },
+    team: {
+      title: 'Teammate invite or join request is missing',
+      steps: [
+        'Verify that the student has completed their Student Profile before inviting them.',
+        'Students already in another active team cannot accept new invitations.',
+        'Team Leads can manage pending requests under Lead → Join Requests.',
+      ],
+    },
+  };
+
+  const completedCount = checklistSteps.filter((s) => checkedItems[s.id]).length;
 
   return (
     <div style={{ animation: 'pageIn 0.35s ease both', maxWidth: 960, margin: '0 auto', paddingBottom: 60 }}>
@@ -55,7 +102,8 @@ export const UserManualScreen: React.FC = () => {
           { key: 'rubrics', label: '2. 200-Mark Rubrics Scheme', icon: Award },
           { key: 'leads', label: '3. Team Governance', icon: Users },
           { key: 'reports', label: '4. Institutional Reports', icon: FileCheck },
-          { key: 'faq', label: '5. FAQ & Troubleshooting', icon: HelpCircle },
+          { key: 'faq', label: '5. FAQ & Governance', icon: HelpCircle },
+          { key: 'troubleshooter', label: '6. Checklist & Troubleshooter', icon: Sparkles },
         ].map((tab) => {
           const Icon = tab.icon;
           const isSel = activeSection === tab.key;
@@ -463,6 +511,110 @@ export const UserManualScreen: React.FC = () => {
               </div>
             </div>
           </AppCard>
+        </div>
+      )}
+
+      {/* ── SECTION 6: INTERACTIVE CHECKLIST & TROUBLESHOOTER ── */}
+      {activeSection === 'troubleshooter' && (
+        <div className="space-y-5">
+          <div className="surface-card rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-extrabold text-[#0A2540]">
+                  Quick-Start Onboarding Checklist
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Track your setup progress ({completedCount} of {checklistSteps.length} completed)
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-xs font-bold font-mono">
+                {Math.round((completedCount / checklistSteps.length) * 100)}%
+              </span>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full bg-[#1D63ED] transition-all duration-300"
+                style={{ width: `${(completedCount / checklistSteps.length) * 100}%` }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              {checklistSteps.map((step) => {
+                const checked = Boolean(checkedItems[step.id]);
+                return (
+                  <label
+                    key={step.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      checked
+                        ? 'bg-[#ECFDF5]/60 border-[#A7F3D0]'
+                        : 'bg-white border-[#D6E4EE] hover:border-[#1D63ED]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setCheckedItems((prev) => ({ ...prev, [step.id]: !prev[step.id] }))
+                      }
+                      className="w-4 h-4 accent-[#1D63ED] rounded"
+                    />
+                    <span
+                      className={`text-xs font-semibold ${
+                        checked ? 'line-through text-slate-500' : 'text-[#0A2540]'
+                      }`}
+                    >
+                      {step.text}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="surface-card rounded-2xl p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-extrabold text-[#0A2540]">
+                Interactive Issue Troubleshooter
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pick the issue you are experiencing for step-by-step resolution.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'login', label: 'Sign-In / OAuth' },
+                { id: 'pdf', label: 'PDF Viewer / Download' },
+                { id: 'marks', label: 'Marks Visibility' },
+                { id: 'team', label: 'Team Invites' },
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedSymptom(s.id)}
+                  className={`h-9 px-3.5 rounded-lg text-xs font-bold border transition-colors ${
+                    selectedSymptom === s.id
+                      ? 'bg-[#1D63ED] text-white border-[#1D63ED]'
+                      : 'bg-white text-slate-600 border-[#D6E4EE] hover:border-[#1D63ED]'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50/90 border border-[#D6E4EE] space-y-2.5">
+              <div className="text-sm font-bold text-[#0A2540]">
+                {troubleshooterGuides[selectedSymptom].title}
+              </div>
+              <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-700 leading-relaxed">
+                {troubleshooterGuides[selectedSymptom].steps.map((st, idx) => (
+                  <li key={idx}>{st}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
         </div>
       )}
     </div>

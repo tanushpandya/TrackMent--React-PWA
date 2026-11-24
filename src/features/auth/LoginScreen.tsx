@@ -23,8 +23,6 @@ export const LoginScreen: React.FC = () => {
     if (status === 'ready' && profile) {
       if (profile.role === 'MENTOR') {
         navigate('/mentor/dashboard', { replace: true });
-      } else if (profile.role === 'TEAM_LEAD') {
-        navigate('/lead/dashboard', { replace: true });
       } else {
         navigate('/student/dashboard', { replace: true });
       }
@@ -65,9 +63,7 @@ export const LoginScreen: React.FC = () => {
       showToast('Logged in successfully! ✨', 'success');
       if (prof?.role === 'MENTOR') {
         navigate('/mentor/dashboard', { replace: true });
-      } else if (prof?.role === 'TEAM_LEAD') {
-        navigate('/lead/dashboard', { replace: true });
-      } else if (prof?.role === 'STUDENT') {
+      } else if (prof?.role === 'TEAM_LEAD' || prof?.role === 'STUDENT') {
         navigate('/student/dashboard', { replace: true });
       } else {
         const detected = AuthService.detectEmailRole(cleanEmail);

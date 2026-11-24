@@ -78,7 +78,7 @@ export const CreateTeamScreen: React.FC = () => {
       showToast(`Team "${newTeam.teamName}" created! You are now the Team Lead.`, 'success');
       await refreshProfile();
       await refreshTeam();
-      navigate('/lead/dashboard', { replace: true });
+      navigate('/student/dashboard', { replace: true });
     } catch (err: any) {
       console.error('Error creating team:', err);
       setError(err?.message || 'Could not create team. Please try again.');

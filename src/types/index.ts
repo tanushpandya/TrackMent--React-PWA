@@ -63,6 +63,13 @@ export interface ContributionModel {
   createdAt?: string;
   updatedAt?: string;
   files?: ContributionFile[];
+  contributionType?: string;
+  contribution_type?: string;
+  author_name?: string;
+  author_id?: string;
+  student_id?: string;
+  created_at?: string;
+  proof_links?: string[];
 }
 
 export interface ContributionFile {
@@ -151,6 +158,8 @@ export interface FeedbackModel {
   feedbackType: FeedbackType;
   content?: string | null;
   createdAt: string;
+  directiveType?: string;
+  comment?: string;
 }
 
 export interface TeamEvaluation {
@@ -199,6 +208,7 @@ export interface TeamInvitationModel {
   leaderName?: string;
   leaderBranch?: string;
   studentId: string;
+  inviteeId?: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
   createdAt: string;
 }
@@ -212,6 +222,7 @@ export interface JoinRequestModel {
   studentBranch?: string;
   skills?: string[];
   message?: string;
+  note?: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   isAlreadyTeammate?: boolean;
   createdAt: string;

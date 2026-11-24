@@ -31,6 +31,7 @@ import { StorageService } from '../../services/storage.service';
 import { ContributionService } from '../../services/contribution.service';
 import { TeamService } from '../../services/team.service';
 import { AppCard } from '../../components/common/AppCard';
+import { SecurePdfViewerModal } from '../../components/common/SecurePdfViewerModal';
 
 // Bounded O(1) date formatter with India Standard Time context
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
@@ -168,6 +169,11 @@ export const MentorGanttChart: React.FC<Props> = ({
   singleTeamContributions,
 }) => {
   // P0 Fix: Manage team selection through a single synchronized ID
+  const [pdfPreviewFile, setPdfPreviewFile] = useState<{
+    storagePath: string;
+    fileName: string;
+    submissionNumber: string | number;
+  } | null>(null);
   const [internalTeamId, setInternalTeamId] = useState<number | null>(() => {
     if (singleTeam) return singleTeam.id;
     if (selectedTeamId !== undefined) return selectedTeamId;
@@ -1490,13 +1496,12 @@ export const MentorGanttChart: React.FC<Props> = ({
 
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              const url = await StorageService.getSignedUrl(file.storagePath);
-                              window.open(url, '_blank', 'noopener,noreferrer');
-                            } catch (e: any) {
-                              alert(e.message || 'Could not open file.');
-                            }
+                          onClick={() => {
+                            setPdfPreviewFile({
+                              storagePath: file.storagePath,
+                              fileName: file.fileName,
+                              submissionNumber: selectedContribution.id,
+                            });
                           }}
                           style={{
                             display: 'inline-flex',
@@ -1561,6 +1566,19 @@ export const MentorGanttChart: React.FC<Props> = ({
           </div>
         </div>
       )}
+      {/* Secure In-App PDF Viewer Modal (Prevents Supabase URL/Credential Exposure) */}
+      <SecurePdfViewerModal
+        isOpen={Boolean(pdfPreviewFile)}
+        onClose={() => setPdfPreviewFile(null)}
+        resolveUrl={
+          pdfPreviewFile
+            ? () => StorageService.getSignedUrl(pdfPreviewFile.storagePath)
+            : undefined
+        }
+        teamName={activeTeam?.teamName || 'Team'}
+        submissionNumber={pdfPreviewFile?.submissionNumber ?? 1}
+        title={pdfPreviewFile?.fileName}
+      />
     </div>
   );
 };
