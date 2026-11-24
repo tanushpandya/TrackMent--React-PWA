@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -245,7 +245,10 @@ export const TeamInformationView: React.FC = () => {
     );
   }
 
-  const verifiedContributions = contributions.filter((c) => c.status === 'CONFIRMED');
+  const verifiedContributions = useMemo(
+    () => contributions.filter((c) => c.status === 'CONFIRMED'),
+    [contributions]
+  );
 
   const p1Score = 38;
   const p2Score = 84;
@@ -260,14 +263,17 @@ export const TeamInformationView: React.FC = () => {
     { title: 'Final Comprehensive Project Defense Thesis', phase: 'Phase 3', uploaded: false, format: 'PDF', date: 'Pending' },
   ];
 
-  const sortedContributions = [...verifiedContributions];
-  if (submissionFilter === 'date') {
-    sortedContributions.sort(
-      (a, b) =>
-        new Date(b.created_at || b.createdAt || 0).getTime() -
-        new Date(a.created_at || a.createdAt || 0).getTime()
-    );
-  }
+  const sortedContributions = useMemo(() => {
+    const list = [...verifiedContributions];
+    if (submissionFilter === 'date') {
+      list.sort(
+        (a, b) =>
+          new Date(b.created_at || b.createdAt || 0).getTime() -
+          new Date(a.created_at || a.createdAt || 0).getTime()
+      );
+    }
+    return list;
+  }, [verifiedContributions, submissionFilter]);
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">

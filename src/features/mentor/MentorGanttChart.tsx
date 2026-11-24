@@ -406,20 +406,44 @@ export const MentorGanttChart: React.FC<Props> = ({
     };
   }, [activeTeam, contributions]);
 
-  // Derived progress percentage strictly based on verified evidence
-  const calculatedProgress = useMemo(() => {
+  // Derived progress percentage and milestone stats strictly based on verified evidence
+  const milestoneStats = useMemo(() => {
+    const map = new Map<string, { confirmedCount: number; pendingCount: number; completionPct: number }>();
     let weightedScore = 0;
-    milestones.forEach((m) => {
+
+    for (let mIdx = 0; mIdx < milestones.length; mIdx++) {
+      const m = milestones[mIdx];
       let confirmed = 0;
+      let pending = 0;
       const list = m.contributions || [];
       for (let i = 0; i < list.length; i++) {
-        if (list[i].status === 'CONFIRMED') confirmed++;
+        const s = list[i].status;
+        if (s === 'CONFIRMED') confirmed++;
+        else if (s === 'PENDING') pending++;
       }
+      const completionPct = Math.min(100, Math.round((confirmed / 2) * 100));
+      map.set(m.id, { confirmedCount: confirmed, pendingCount: pending, completionPct });
+
       const milestoneCompletion = Math.min(1.0, confirmed / 2.0);
       weightedScore += m.weightPct * milestoneCompletion;
-    });
-    return Math.round(weightedScore);
+    }
+
+    return { map, totalProgressPct: Math.round(weightedScore) };
   }, [milestones]);
+
+  const calculatedProgress = milestoneStats.totalProgressPct;
+
+  // Single-pass total confirmed & pending counts across all contributions
+  const submissionCounts = useMemo(() => {
+    let confirmed = 0;
+    let pending = 0;
+    for (let i = 0; i < contributions.length; i++) {
+      const s = contributions[i].status;
+      if (s === 'CONFIRMED') confirmed++;
+      else if (s === 'PENDING') pending++;
+    }
+    return { confirmed, pending };
+  }, [contributions]);
 
   // P1 Fix: Dynamic Current Milestone Determination (Eliminates hardcoded Phase 2 fallback)
   const currentMilestoneSummary = useMemo(() => {
@@ -876,10 +900,10 @@ export const MentorGanttChart: React.FC<Props> = ({
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, fontWeight: 700, marginTop: 12 }}>
                 <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <Check size={13} /> {contributions.filter((c) => c.status === 'CONFIRMED').length} Confirmed
+                  <Check size={13} /> {submissionCounts.confirmed} Confirmed
                 </span>
                 <span style={{ color: '#D97706', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  • {contributions.filter((c) => c.status === 'PENDING').length} Pending
+                  • {submissionCounts.pending} Pending
                 </span>
               </div>
             </div>
@@ -963,9 +987,8 @@ export const MentorGanttChart: React.FC<Props> = ({
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {milestones.map((m, idx) => {
-              const confirmedCount = (m.contributions || []).filter((c) => c.status === 'CONFIRMED').length;
-              const pendingCount = (m.contributions || []).filter((c) => c.status === 'PENDING').length;
-              const completionPct = Math.min(100, Math.round((confirmedCount / 2) * 100));
+              const mStats = milestoneStats.map.get(m.id) || { confirmedCount: 0, pendingCount: 0, completionPct: 0 };
+              const { confirmedCount, pendingCount, completionPct } = mStats;
 
               return (
                 <div

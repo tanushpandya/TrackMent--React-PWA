@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -204,17 +204,25 @@ export const QueueMonitorScreen: React.FC = () => {
 
   const currentDay = SCHEDULER_DAYS[activeDayIdx];
 
-  const confirmedCount = Object.values(schedule).filter((s) => s.status === 'confirmed').length;
-  const requestedCount = pendingRequests.length;
-  const openCount = HALF_HOUR_SLOTS.length - confirmedCount - requestedCount;
+  const { confirmedCount, requestedCount, openCount } = useMemo(() => {
+    let conf = 0;
+    for (const k in schedule) {
+      if (schedule[k].status === 'confirmed') conf++;
+    }
+    const req = pendingRequests.length;
+    const open = Math.max(0, HALF_HOUR_SLOTS.length - conf - req);
+    return { confirmedCount: conf, requestedCount: req, openCount: open };
+  }, [schedule, pendingRequests.length]);
 
-  const visibleSlots = HALF_HOUR_SLOTS.filter((time) => {
-    const appt = schedule[time];
-    if (filterType === 'confirmed') return appt?.status === 'confirmed';
-    if (filterType === 'requested') return appt?.status === 'requested';
-    if (filterType === 'open') return !appt || appt.status === 'open';
-    return true;
-  });
+  const visibleSlots = useMemo(() => {
+    return HALF_HOUR_SLOTS.filter((time) => {
+      const appt = schedule[time];
+      if (filterType === 'confirmed') return appt?.status === 'confirmed';
+      if (filterType === 'requested') return appt?.status === 'requested';
+      if (filterType === 'open') return !appt || appt.status === 'open';
+      return true;
+    });
+  }, [filterType, schedule]);
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">

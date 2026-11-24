@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -164,32 +164,49 @@ export const BrowseMentorsScreen: React.FC = () => {
     );
   }
 
-  // Filter mentors
-  const filteredMentors = mentors.filter((m) => {
-    // Branch filter
-    if (selectedBranch) {
-      const opt = BRANCH_FILTERS.find((b) => b.code === selectedBranch);
-      const dept = (m.department || '').toLowerCase();
-      const branch = (m.branch || '').toLowerCase();
-      const codeMatch = dept.includes(selectedBranch.toLowerCase()) || branch.includes(selectedBranch.toLowerCase());
-      const kwMatch = opt ? opt.keywords.some((kw) => dept.includes(kw) || branch.includes(kw)) : false;
-      if (!codeMatch && !kwMatch) return false;
+  // Filter mentors with memoization
+  const filteredMentors = useMemo(() => {
+    return mentors.filter((m) => {
+      // Branch filter
+      if (selectedBranch) {
+        const opt = BRANCH_FILTERS.find((b) => b.code === selectedBranch);
+        const dept = (m.department || '').toLowerCase();
+        const branch = (m.branch || '').toLowerCase();
+        const codeMatch = dept.includes(selectedBranch.toLowerCase()) || branch.includes(selectedBranch.toLowerCase());
+        const kwMatch = opt ? opt.keywords.some((kw) => dept.includes(kw) || branch.includes(kw)) : false;
+        if (!codeMatch && !kwMatch) return false;
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const name = (m.fullName || '').toLowerCase();
+        const code = (m.facultyCode || '').toLowerCase();
+        const email = (m.email || '').toLowerCase();
+        const dept = (m.department || '').toLowerCase();
+        return name.includes(q) || code.includes(q) || email.includes(q) || dept.includes(q);
+      }
+
+      return true;
+    });
+  }, [mentors, selectedBranch, searchQuery]);
+
+  // Pre-index pending mentor requests into an O(1) Map by mentorId
+  const pendingReqByMentorId = useMemo(() => {
+    const map = new Map<string, MentorRequestModel>();
+    for (let i = 0; i < sentRequests.length; i++) {
+      const r = sentRequests[i];
+      if (r.status === 'PENDING') {
+        map.set(r.mentorId, r);
+      }
     }
+    return map;
+  }, [sentRequests]);
 
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const name = (m.fullName || '').toLowerCase();
-      const code = (m.facultyCode || '').toLowerCase();
-      const email = (m.email || '').toLowerCase();
-      const dept = (m.department || '').toLowerCase();
-      return name.includes(q) || code.includes(q) || email.includes(q) || dept.includes(q);
-    }
-
-    return true;
-  });
-
-  const pendingMentorRequests = sentRequests.filter((r) => r.status === 'PENDING');
+  const pendingMentorRequests = useMemo(
+    () => sentRequests.filter((r) => r.status === 'PENDING'),
+    [sentRequests]
+  );
 
   return (
     <div style={{ minHeight: '100vh', padding: '24px 16px', display: 'flex', justifyContent: 'center' }}>
@@ -429,9 +446,7 @@ export const BrowseMentorsScreen: React.FC = () => {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px' }}>
             {filteredMentors.map((mentorItem) => {
-              const pendingReq = sentRequests.find(
-                (r) => r.mentorId === mentorItem.id && r.status === 'PENDING'
-              );
+              const pendingReq = pendingReqByMentorId.get(mentorItem.id);
               const isCancelling = cancellingId === mentorItem.id;
 
               return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { sanitizeExternalUrl } from '../../utils/url';
 import {
   ExternalLink,
@@ -140,12 +140,25 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
 
   const displayContributions: ContributionModel[] = contributions;
 
-  const filteredContributions = displayContributions.filter((c) => {
-    if (filter === 'MINE') return c.student_id === user?.id;
-    if (filter === 'CONFIRMED') return c.status === 'CONFIRMED';
-    if (filter === 'PENDING') return c.status === 'PENDING';
-    return true;
-  });
+  const { confirmedCount, pendingCount } = useMemo(() => {
+    let conf = 0;
+    let pend = 0;
+    for (let i = 0; i < contributions.length; i++) {
+      const s = contributions[i].status;
+      if (s === 'CONFIRMED' || (s as string) === 'Verified') conf++;
+      else if (s === 'PENDING') pend++;
+    }
+    return { confirmedCount: conf, pendingCount: pend };
+  }, [contributions]);
+
+  const filteredContributions = useMemo(() => {
+    return displayContributions.filter((c) => {
+      if (filter === 'MINE') return c.student_id === user?.id;
+      if (filter === 'CONFIRMED') return c.status === 'CONFIRMED' || (c.status as string) === 'Verified';
+      if (filter === 'PENDING') return c.status === 'PENDING';
+      return true;
+    });
+  }, [displayContributions, filter, user?.id]);
 
   return (
     <div className="space-y-5">
@@ -167,10 +180,10 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-xs font-bold font-mono">
-            {contributions.filter((c) => c.status === 'CONFIRMED').length} Verified
+            {confirmedCount} Verified
           </span>
           <span className="px-2.5 py-1 rounded-md bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] text-xs font-bold font-mono">
-            {contributions.filter((c) => c.status === 'PENDING').length} Pending
+            {pendingCount} Pending
           </span>
         </div>
       </div>
