@@ -1,6 +1,8 @@
 import React, { Suspense, lazy } from 'react';
-import { createBrowserRouter, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTeam } from '../context/TeamContext';
 import { AuthService } from '../services/auth.service';
 import { AppShell } from '../components/layout/AppShell';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
@@ -53,6 +55,7 @@ const UserManualScreen = lazy(() => import('../features/docs/UserManualScreen').
 /** Root redirect helper based on role */
 const RootRedirect: React.FC = () => {
   const { status, user, profile, isMentor, isLead } = useAuth();
+  const { team } = useTeam();
   if (status === 'loading') return null;
   if (status === 'guest' || !user) return <Navigate to="/home" replace />;
   if (status === 'newUser') {
@@ -61,87 +64,52 @@ const RootRedirect: React.FC = () => {
   }
   if (!profile) return <Navigate to="/login" replace />;
   if (isMentor) return <Navigate to="/mentor/dashboard" replace />;
-  if (isLead) return <Navigate to="/lead/dashboard" replace />;
+  const isLeader = Boolean(isLead || (team && team.leaderId === profile.id) || profile.role === 'TEAM_LEAD');
+  if (isLeader) return <Navigate to="/lead/dashboard" replace />;
   return <Navigate to="/student/dashboard" replace />;
 };
 
-/** 404 Not Found Page (matches Flutter router errorBuilder) */
+/** 404 Not Found Page */
 const NotFoundPage: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, isMentor, isLead } = useAuth();
+  const { team } = useTeam();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isLeader = Boolean(isLead || (team && profile && team.leaderId === profile.id) || profile?.role === 'TEAM_LEAD');
   const homeRoute = profile
-    ? profile.role === 'MENTOR'
+    ? isMentor
       ? '/mentor/dashboard'
-      : profile.role === 'TEAM_LEAD'
+      : isLeader
       ? '/lead/dashboard'
       : '/student/dashboard'
     : '/login';
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#F8FAFC',
-        padding: '24px',
-      }}
-    >
-      <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' }}>
-        <div
-          style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '50%',
-            background: 'rgba(37, 99, 235, 0.1)',
-            color: '#2563EB',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '32px',
-            margin: '0 auto 20px',
-          }}
-        >
-          🔍
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="surface-card max-w-md w-full p-8 text-center">
+        <div className="w-14 h-14 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D63ED] flex items-center justify-center mx-auto mb-5">
+          <Search className="w-6 h-6" />
         </div>
-        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', margin: '0 0 8px 0' }}>
+        <h1 className="text-xl font-bold text-[#0A2540] mb-2">
           Page Not Found
         </h1>
-        <p style={{ margin: '0 0 24px 0', fontSize: '13.5px', color: '#64748B', lineHeight: 1.5 }}>
-          The route "{location.pathname}" could not be resolved or was moved.
+        <p className="text-[13px] text-slate-500 leading-relaxed mb-6">
+          The route <span className="font-mono text-slate-700">{location.pathname}</span> could not be resolved or was moved.
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+        <div className="flex justify-center gap-3">
           <button
+            type="button"
             onClick={() => navigate('/login')}
-            style={{
-              padding: '10px 18px',
-              borderRadius: '8px',
-              border: '1px solid #CBD5E1',
-              background: 'white',
-              color: '#334155',
-              fontSize: '13.5px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="btn"
           >
             Back to Login
           </button>
           <button
+            type="button"
             onClick={() => navigate(homeRoute)}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#2563EB',
-              color: 'white',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
+            className="btn btn-primary"
           >
             Go to Dashboard
           </button>
@@ -217,18 +185,8 @@ export const router = createBrowserRouter([
       </Suspense>
     ),
   },
-  {
-    path: '/profile/edit',
-    element: (
-      <ProtectedRoute>
-        <Suspense fallback={<RouteLoadingSpinner />}>
-          <EditProfileScreen />
-        </Suspense>
-      </ProtectedRoute>
-    ),
-  },
 
-  // Team Formation Entry Routes
+  // Team Formation Entry Routes (pre-team onboarding, no AppShell)
   {
     path: '/team-formation/before-team',
     element: (
@@ -260,16 +218,6 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: '/team-formation/browse-students',
-    element: (
-      <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
-        <Suspense fallback={<RouteLoadingSpinner />}>
-          <BrowseStudentsScreen />
-        </Suspense>
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: '/team-formation/invitations',
     element: (
       <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
@@ -288,6 +236,23 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      // ── Shared Profile & Recruitment Routes inside AppShell ──
+      {
+        path: '/profile/edit',
+        element: (
+          <ProtectedRoute>
+            <EditProfileScreen />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/team-formation/browse-students',
+        element: (
+          <ProtectedRoute allowedRoles={['STUDENT', 'TEAM_LEAD']}>
+            <BrowseStudentsScreen />
+          </ProtectedRoute>
+        ),
+      },
       // ── Student Workspace ──
       {
         path: '/student/dashboard',

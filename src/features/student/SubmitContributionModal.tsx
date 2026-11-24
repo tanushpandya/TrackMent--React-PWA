@@ -137,7 +137,7 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
       }
 
       setUploadProgress(100);
-      showToast('Deliverable submitted for review! ✨', 'success');
+      showToast('Deliverable submitted for review.', 'success');
       onSuccess();
       onClose();
 
@@ -289,7 +289,7 @@ export const SubmitContributionModal: React.FC<SubmitContributionModalProps> = (
             }}
           >
             <Upload size={24} color="#0B4D88" style={{ marginBottom: 6 }} />
-            <span style={{ fontSize: 13, fontWeight: 750, color: '#102F48' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#102F48' }}>
               Click or drag files to upload proofs
             </span>
             <span style={{ fontSize: 11, color: '#7992A1', marginTop: 2 }}>

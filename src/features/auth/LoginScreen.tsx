@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, LogIn } from 'lucide-react';
-import { FluidMascot } from '../../components/mascot/FluidMascot';
 import { AuthService } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -60,10 +59,12 @@ export const LoginScreen: React.FC = () => {
     setErrorMsg(null);
     try {
       const prof = await signInWithPassword(cleanEmail, password);
-      showToast('Logged in successfully! ✨', 'success');
+      showToast('Logged in successfully.', 'success');
       if (prof?.role === 'MENTOR') {
         navigate('/mentor/dashboard', { replace: true });
-      } else if (prof?.role === 'TEAM_LEAD' || prof?.role === 'STUDENT') {
+      } else if (prof?.role === 'TEAM_LEAD') {
+        navigate('/lead/dashboard', { replace: true });
+      } else if (prof?.role === 'STUDENT') {
         navigate('/student/dashboard', { replace: true });
       } else {
         const detected = AuthService.detectEmailRole(cleanEmail);
@@ -84,56 +85,18 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 16px',
-        background:
-          'linear-gradient(180deg, #6FAFD0 0%, #C4E0EB 27%, #F6FBFD 53%, #C8E8EF 78%, #A9CEDE 100%)',
-      }}
-    >
-      {/* Ambient Orbs */}
-      <div className="ambient ambient-a" />
-      <div className="ambient ambient-b" />
-
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 440,
-          background: '#FFFFFF',
-          borderRadius: 22,
-          border: '1px solid #D5E8EF',
-          boxShadow: '0 20px 48px rgba(12, 64, 101, 0.18)',
-          padding: '32px 28px',
-          animation: 'pageIn 0.4s ease both',
-          textAlign: 'center',
-        }}
-      >
+    <div className="min-h-screen flex items-center justify-center px-4 py-6">
+      <div className="surface-card w-full max-w-[440px] p-7 sm:p-8 text-center animate-in fade-in duration-200">
         {/* TrackMent Logo */}
-        <div style={{ marginBottom: 16 }}>
+        <div className="flex justify-center mb-4">
           <img
             src="/images/trackment_logo.png"
             alt="TrackMent"
-            style={{
-              width: 64,
-              height: 64,
-              objectFit: 'contain',
-              borderRadius: 16,
-              boxShadow: '0 6px 16px rgba(15, 69, 149, 0.2)',
-            }}
+            className="w-[72px] h-[72px] object-contain rounded-2xl shadow-md"
             onError={(e) => {
-              // fallback if image not loaded yet
               e.currentTarget.style.display = 'none';
             }}
           />
-        </div>
-
-        {/* Mascot */}
-        <div style={{ marginBottom: 14 }}>
-          <FluidMascot mood="happy" message="Your next idea starts here!" size={92} />
         </div>
 
         {/* Title & Tagline */}
@@ -174,7 +137,7 @@ export const LoginScreen: React.FC = () => {
             marginBottom: 24,
           }}
         >
-          🎓 RV College of Engineering · Project Portal
+          RV College of Engineering · Project Portal
         </div>
 
         {/* Mode Toggle: Log In / Sign Up */}
@@ -356,7 +319,7 @@ export const LoginScreen: React.FC = () => {
                 background: '#FFFFFF',
               }}
             >
-              <span style={{ fontSize: 16 }}>🌐</span> Sign in with Google (@rvce.edu.in)
+              Sign in with Google (@rvce.edu.in)
             </button>
           </div>
         ) : (
@@ -384,7 +347,7 @@ export const LoginScreen: React.FC = () => {
                 fontSize: 14,
               }}
             >
-              <span style={{ fontSize: 16 }}>🌐</span> Sign up with Google (@rvce.edu.in)
+              Sign up with Google (@rvce.edu.in)
             </button>
           </div>
         )}
@@ -413,7 +376,7 @@ export const LoginScreen: React.FC = () => {
               gap: 4,
             }}
           >
-            📖 Read User Manual & Grading Rubrics
+            Read User Manual &amp; Grading Rubrics
           </Link>
         </div>
       </div>

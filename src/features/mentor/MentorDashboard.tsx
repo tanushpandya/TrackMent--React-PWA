@@ -24,6 +24,7 @@ import {
   Filter,
   BarChart3,
   List,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -194,7 +195,7 @@ export const MentorDashboard: React.FC = () => {
         category: broadcastCategory,
       });
 
-      showToast(`Broadcast notice sent to all ${teams.length} assigned teams! 📢`, 'success');
+      showToast(`Broadcast notice sent to all ${teams.length} assigned teams.`, 'success');
       setBroadcastSubject('');
       setBroadcastMessage('');
       setIsBroadcastOpen(false);
@@ -229,12 +230,12 @@ export const MentorDashboard: React.FC = () => {
   });
 
   // Calculate cohort metrics
-  const avgCohortScore = teams.length > 0
+  const avgCohortProgress = teams.length > 0
     ? Math.round(teams.reduce((acc, t) => acc + (t.currentProgressPct || 0), 0) / teams.length)
-    : 83;
+    : 0;
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+    <div className="space-y-5">
       {/* 4-Column Top KPI Strip (Clean Desktop Grid of White Surface Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Assigned Teams */}
@@ -252,9 +253,9 @@ export const MentorDashboard: React.FC = () => {
             </div>
           </div>
           <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Sem 3 • RVCE Cohort</span>
-            <button onClick={() => navigate('/mentor/add-team')} className="font-semibold text-[#1D63ED] hover:underline">
-              + Add from pool →
+            <span className="text-slate-500">Active Cohort</span>
+            <button type="button" onClick={() => navigate('/mentor/add-team')} className="font-semibold text-[#1D63ED] hover:underline">
+              + Add from pool
             </button>
           </div>
         </div>
@@ -278,22 +279,22 @@ export const MentorDashboard: React.FC = () => {
             </div>
           </div>
           <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Today's Schedule</span>
-            <button onClick={() => navigate('/mentor/queue-monitor')} className="font-semibold text-[#1D63ED] hover:underline">
-              Open Scheduler →
+            <span className="text-slate-500">Consultation Queue</span>
+            <button type="button" onClick={() => navigate('/mentor/queue-monitor')} className="font-semibold text-[#1D63ED] hover:underline">
+              Open Scheduler
             </button>
           </div>
         </div>
 
-        {/* Card 3: Avg Cohort Score */}
+        {/* Card 3: Avg Cohort Progress */}
         <div className="surface-card p-5 flex flex-col justify-between gap-3">
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Avg Cohort Score</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Avg Cohort Progress</div>
               <div className="mt-1.5 flex items-baseline gap-2">
-                <span className="text-3xl font-bold font-mono text-[#0A2540] tabular-nums">{avgCohortScore}%</span>
-                <span className="px-2 py-0.5 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-[11px] font-semibold font-mono">
-                  Phase 1 &amp; 2 Recorded
+                <span className="text-3xl font-bold font-mono text-[#0A2540] tabular-nums">{avgCohortProgress}%</span>
+                <span className="text-xs font-medium text-slate-500">
+                  Across {teams.length} {teams.length === 1 ? 'team' : 'teams'}
                 </span>
               </div>
             </div>
@@ -302,9 +303,9 @@ export const MentorDashboard: React.FC = () => {
             </div>
           </div>
           <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Benchmark: 80%</span>
-            <button onClick={() => setIsExtractMarksOpen(true)} className="font-semibold text-[#1D63ED] hover:underline">
-              Export Marks Report →
+            <span className="text-slate-500">CIE Evaluation</span>
+            <button type="button" onClick={() => setIsExtractMarksOpen(true)} className="font-semibold text-[#1D63ED] hover:underline">
+              Export Marks Report
             </button>
           </div>
         </div>
@@ -341,45 +342,13 @@ export const MentorDashboard: React.FC = () => {
           </div>
           <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Live for all teams</span>
-            <button onClick={() => setIsBroadcastOpen(true)} className="font-semibold text-[#1D63ED] hover:underline">
-              📢 Broadcast Notice →
+            <button type="button" onClick={() => setIsBroadcastOpen(true)} className="font-semibold text-[#1D63ED] hover:underline inline-flex items-center gap-1">
+              <Megaphone className="w-3.5 h-3.5" />
+              <span>Broadcast Notice</span>
             </button>
           </div>
         </div>
       </div>
-
-      {/* Broadcast Notice Bar */}
-      {!bannerDismissed && (
-        <div className="surface-card rounded-xl p-4 bg-gradient-to-r from-white via-[#EFF6FF]/60 to-[#ECFDF5]/50 flex flex-col md:flex-row md:items-center justify-between gap-3 border border-[#BFDBFE]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#1D63ED] text-white flex items-center justify-center shrink-0">
-              <Megaphone className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-[#0A2540]">
-                Cohort Announcement: Phase 2 CIE evaluation rubrics finalized
-              </div>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Ensure all teams link simulation demo videos and architectural diagrams before Friday 05:00 PM.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setIsBroadcastOpen(true)}
-              className="h-8 px-3 rounded-lg bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold shadow-xs transition-colors"
-            >
-              Send New Notice
-            </button>
-            <button
-              onClick={() => setBannerDismissed(true)}
-              className="h-8 px-2.5 rounded-lg border border-[#D6E4EE] bg-white text-slate-500 text-xs font-semibold hover:bg-slate-50"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Global Search + Track & Sort Filter Bar */}
       <div className="surface-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -570,8 +539,7 @@ export const MentorDashboard: React.FC = () => {
                       {/* 5. Submissions */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-xs font-semibold font-mono tabular-nums">
-                          <span>✓</span>
-                          <span>4 Verified</span>
+                          <span>Active</span>
                         </span>
                       </td>
 
@@ -600,10 +568,12 @@ export const MentorDashboard: React.FC = () => {
           <div className="surface-card rounded-xl max-w-lg w-full overflow-hidden shadow-modal animate-in fade-in zoom-in-95 duration-100">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-[#0A2540]">📢 Broadcast Announcement to All Teams</h3>
+                <h3 className="text-base font-bold text-[#0A2540]">Broadcast Announcement to All Teams</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Send official notice to all {teams.length} assigned teams</p>
               </div>
-              <button onClick={() => setIsBroadcastOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button type="button" onClick={() => setIsBroadcastOpen(false)} aria-label="Close" className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="p-5 space-y-3.5">
@@ -659,7 +629,7 @@ export const MentorDashboard: React.FC = () => {
                 className="h-9 px-4 rounded-lg bg-[#1D63ED] hover:bg-[#1752C9] text-white text-xs font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
               >
                 {isBroadcasting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>Send Broadcast 📢</span>
+                <span>Send Broadcast</span>
               </button>
             </div>
           </div>

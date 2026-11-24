@@ -749,7 +749,7 @@ export const MentorGanttChart: React.FC<Props> = ({
             }}
           >
             <Loader2 size={32} color="#0B4D88" className="spin" />
-            <div style={{ fontSize: 14, fontWeight: 750, color: '#0F172A' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
               Loading milestone timeline & deliverables for {activeTeam.teamName}...
             </div>
             <div style={{ fontSize: 12, color: '#64748B' }}>
@@ -1251,7 +1251,7 @@ export const MentorGanttChart: React.FC<Props> = ({
                         <h5
                           style={{
                             fontSize: 14.5,
-                            fontWeight: 850,
+                            fontWeight: 800,
                             color: '#0F172A',
                             margin: 0,
                             overflow: 'hidden',

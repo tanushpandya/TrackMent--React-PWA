@@ -337,7 +337,7 @@ export const FluidMascot: React.FC<FluidMascotProps> = ({
             border: '1px solid #c8e0e8',
             boxShadow: '0 8px 18px rgba(18, 74, 110, 0.12)',
             fontSize: 11,
-            fontWeight: 750,
+            fontWeight: 700,
             color: '#102F48',
             textAlign: 'center',
             lineHeight: 1.4,

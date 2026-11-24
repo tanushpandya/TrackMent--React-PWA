@@ -56,7 +56,7 @@ export const JoinRequestsScreen: React.FC = () => {
     setActingId(requestId);
     try {
       await TeamService.respondToJoinRequest(requestId, accept);
-      showToast(accept ? 'Student accepted into team roster! ✨' : 'Join request declined.', accept ? 'success' : 'info');
+      showToast(accept ? 'Student accepted into team roster.' : 'Join request declined.', accept ? 'success' : 'info');
       await Promise.all([loadRequests(), refreshTeam()]);
     } catch (e: any) {
       console.error('Error responding to request:', e);

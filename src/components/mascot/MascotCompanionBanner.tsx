@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export interface MascotCompanionBannerProps {
   defaultMessage?: string;
@@ -13,28 +12,28 @@ export interface MascotCompanionBannerProps {
 
 export const MascotCompanionBanner: React.FC<MascotCompanionBannerProps> = ({
   defaultMessage,
-  defaultMood,
-  isLead,
   subtitle,
   actionText,
   onAction,
-  mentorName = 'Prof. Dr. Badarinath K B',
+  mentorName,
 }) => {
   const [cheered, setCheered] = useState(false);
   const [quoteIdx, setQuoteIdx] = useState(0);
 
+  const mentorLabel = mentorName ? `${mentorName}'s` : 'your mentor\'s';
+
   const quotes = [
     {
-      headline: `Companion energized! Your team is ready for ${mentorName}’s review 🚀`,
-      sub: 'All milestones aligned. Keep pushing forward together!',
+      headline: `Your team is on track for ${mentorLabel} next review`,
+      sub: 'All milestones aligned. Keep pushing forward together.',
     },
     {
-      headline: 'Excellent sprint momentum! Phase 2 artifacts verified ✨',
-      sub: 'Your test coverage and architecture docs look crisp and compliant.',
+      headline: 'Strong sprint momentum — keep your artifacts documented',
+      sub: 'Up-to-date test coverage and architecture notes streamline evaluations.',
     },
     {
-      headline: 'Great teamwork detected! Consistency leads to 40/40 CIE 🎯',
-      sub: 'Your proof-of-work log is up to date for your upcoming consultation.',
+      headline: 'Consistent contributions build a stronger CIE evaluation',
+      sub: 'Keep your proof-of-work log updated ahead of your upcoming consultation.',
     },
   ];
 
@@ -55,28 +54,32 @@ export const MascotCompanionBanner: React.FC<MascotCompanionBannerProps> = ({
   const currentQuote = quotes[quoteIdx % quotes.length];
   const headline = cheered
     ? currentQuote.headline
-    : defaultMessage || `Your mentor requested a meeting: "Phase 2 Architecture & Demo"`;
+    : defaultMessage || 'Stay on top of your upcoming project milestones.';
   const subline = cheered
     ? currentQuote.sub
-    : subtitle || 'Your friendly project companion is cheering you on.';
+    : subtitle || 'Your project companion tracks progress and upcoming reviews.';
 
   return (
     <div
-      onClick={handleOrbClick}
-      className={`surface-card p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer transition-all hover:border-[#1D63ED]/50 mb-5 ${
+      className={`surface-card p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all mb-5 ${
         cheered
           ? 'bg-gradient-to-r from-white via-[#EFF6FF]/75 to-[#ECFDF5]/65'
           : 'bg-gradient-to-r from-white to-[#EFF6FF]/70'
       }`}
     >
-      <div className="flex items-center gap-4">
-        {/* Animated Friendly Blue Companion Orb */}
-        <div
-          className={`w-12 h-12 shrink-0 orb-float ${cheered ? 'orb-cheered-ring' : ''}`}
-          title="Tap to cheer me up!"
+      <div className="flex items-center gap-4 min-w-0">
+        {/* Isolated semantic button for the Companion Orb */}
+        <button
+          type="button"
+          onClick={handleOrbClick}
+          aria-label={cheered ? 'Cycle companion tip' : 'View companion tip'}
+          title={cheered ? 'Click to cycle tip' : 'Click for a project tip'}
+          className={`w-12 h-12 shrink-0 rounded-full orb-float focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1D63ED] ${
+            cheered ? 'orb-cheered-ring' : ''
+          }`}
         >
           {cheered ? (
-            <svg viewBox="0 0 64 64" className="w-12 h-12 drop-shadow-sm">
+            <svg viewBox="0 0 64 64" className="w-12 h-12 drop-shadow-sm" aria-hidden="true">
               <defs>
                 <radialGradient id="orbHappy" cx="35%" cy="30%" r="70%">
                   <stop offset="0%" stopColor="#7DD3FC" />
@@ -116,13 +119,9 @@ export const MascotCompanionBanner: React.FC<MascotCompanionBannerProps> = ({
                 strokeLinecap="round"
                 fill="none"
               />
-              <path
-                d="M53 11 L54.5 14.5 L58 16 L54.5 17.5 L53 21 L51.5 17.5 L48 16 L51.5 14.5 Z"
-                fill="#FBBF24"
-              />
             </svg>
           ) : (
-            <svg viewBox="0 0 64 64" className="w-12 h-12 drop-shadow-sm">
+            <svg viewBox="0 0 64 64" className="w-12 h-12 drop-shadow-sm" aria-hidden="true">
               <defs>
                 <radialGradient id="orbBlue" cx="35%" cy="30%" r="70%">
                   <stop offset="0%" stopColor="#60A5FA" />
@@ -164,23 +163,20 @@ export const MascotCompanionBanner: React.FC<MascotCompanionBannerProps> = ({
               />
             </svg>
           )}
-        </div>
+        </button>
 
-        <div>
+        <div className="min-w-0">
           <div className="text-[14px] font-bold text-[#0A2540]">
             {headline}
           </div>
           <p className="text-xs text-slate-600 mt-0.5">
             {subline}
-            <span className="font-semibold text-[#1D63ED] ml-1">
-              {cheered ? 'Cheered up! (Tap to cycle)' : 'Tap to cheer me up ✨'}
-            </span>
           </p>
         </div>
       </div>
 
       {actionText && (
-        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={onAction}

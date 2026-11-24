@@ -115,7 +115,7 @@ export const StudentMeetingScreen: React.FC = () => {
         agenda: `[${selectedSlot} - ${meetingType}] ${agenda.trim()}`,
       });
 
-      showToast(`Slot ${selectedSlot} booked and request dispatched to mentor! 📅`, 'success');
+      showToast(`Slot ${selectedSlot} booked and request dispatched to mentor.`, 'success');
       setAgenda('');
       await loadAppointments();
     } catch (err: any) {
@@ -150,7 +150,7 @@ export const StudentMeetingScreen: React.FC = () => {
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Book 30-minute review slots with {mentor?.fullName || 'Prof. Dr. Badarinath K B (CSE • RVCE)'}
+            Book 30-minute review slots with {mentor?.fullName || 'your assigned faculty mentor'}
           </p>
         </div>
 
@@ -267,7 +267,7 @@ export const StudentMeetingScreen: React.FC = () => {
               className="w-full h-9 rounded-lg bg-[#0F4C81] hover:bg-[#1D63ED] text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Confirm Booking &amp; Notify Mentor 🚀</span>
+              <span>Confirm Booking &amp; Notify Mentor</span>
             </button>
           </form>
         </div>

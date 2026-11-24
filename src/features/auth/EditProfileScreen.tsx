@@ -116,7 +116,7 @@ export const EditProfileScreen: React.FC = () => {
       });
 
       await refreshProfile();
-      showToast('Profile updated successfully! ✨', 'success');
+      showToast('Profile updated successfully.', 'success');
     } catch (err: any) {
       showToast(err?.message || 'Failed to update profile', 'error');
     } finally {
@@ -138,7 +138,7 @@ export const EditProfileScreen: React.FC = () => {
     setPasswordLoading(true);
     try {
       await AuthService.updatePassword(newPassword);
-      showToast('Password updated successfully! 🔑', 'success');
+      showToast('Password updated successfully.', 'success');
       setShowPasswordModal(false);
       setNewPassword('');
       setConfirmPassword('');

@@ -14,62 +14,21 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions,
 }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 16,
-        marginBottom: 24,
-      }}
-    >
-      <div style={{ maxWidth: 640 }}>
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 900,
-            letterSpacing: '1.55px',
-            textTransform: 'uppercase',
-            color: '#267B9B',
-            marginBottom: 6,
-          }}
-        >
+    <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
+      <div className="max-w-2xl">
+        <div className="text-[10.5px] font-bold tracking-wider uppercase text-[#1D63ED] mb-1">
           {eyebrow}
         </div>
-        <h1
-          style={{
-            fontSize: 'clamp(24px, 3.2vw, 34px)',
-            fontWeight: 850,
-            letterSpacing: '-1.1px',
-            color: '#102F48',
-            lineHeight: 1.15,
-            margin: '0 0 8px 0',
-          }}
-        >
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0A2540] leading-tight mb-1">
           {title}
         </h1>
-        <p
-          style={{
-            fontSize: 13.5,
-            color: '#5E788C',
-            lineHeight: 1.6,
-            margin: 0,
-          }}
-        >
+        <p className="text-[13px] text-slate-500 leading-relaxed">
           {subtitle}
         </p>
       </div>
 
       {actions && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="flex items-center gap-2.5 flex-wrap">
           {actions}
         </div>
       )}

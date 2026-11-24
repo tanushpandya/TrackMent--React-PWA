@@ -1,26 +1,20 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { sanitizeExternalUrl } from '../../utils/url';
 import {
-  Sparkles,
-  Plus,
   ExternalLink,
-  Download,
-  Trash2,
-  FileText,
   CheckCircle2,
-  Clock,
   Link as LinkIcon,
-  Paperclip,
   X,
   Loader2,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
 import { useToast } from '../../context/ToastContext';
 import { ContributionService } from '../../services/contribution.service';
-import { StorageService } from '../../services/storage.service';
 import { supabase } from '../../services/supabase';
-import { ContributionModel, ContributionStatus } from '../../types';
+import { ContributionModel } from '../../types';
+import { Modal } from '../../components/common/Modal';
 
 interface MyContributionsScreenProps {
   submissionsOnly?: boolean;
@@ -42,9 +36,9 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
   const [description, setDescription] = useState('');
   const [linkInput, setLinkInput] = useState('');
   const [proofLinks, setProofLinks] = useState<string[]>([]);
-  const [attachedFiles, setAttachedFiles] = useState<{ name: string; size: string; file?: File }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadContributions = useCallback(async () => {
     if (!team) return;
@@ -92,34 +86,10 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
     setProofLinks((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    Array.from(e.target.files).forEach((file) => {
-      const kb = Math.max(1, Math.round(file.size / 1024));
-      const sizeLabel = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
-      setAttachedFiles((prev) => [...prev, { name: file.name, size: sizeLabel, file }]);
-    });
-    showToast('File(s) attached to contribution package', 'info');
-  };
-
-  const handleAttachSampleFile = () => {
-    const n = attachedFiles.length + 1;
-    const sample = {
-      name: n === 1 ? 'Feature_Implementation_Report.pdf' : `Test_Coverage_Suite_${n}.png`,
-      size: n === 1 ? '1.2 MB' : '520 KB',
-    };
-    setAttachedFiles((prev) => [...prev, sample]);
-    showToast('Sample proof file attached', 'info');
-  };
-
-  const handleRemoveFile = (idx: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== idx));
-  };
-
   const handleSubmitContribution = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
-      showToast('Please fill out both Title * and Description * before submitting.', 'error');
+      showToast('Please fill out both Title and Description before submitting.', 'error');
       return;
     }
     if (!team || !user) return;
@@ -140,30 +110,31 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
         proofLinks: allLinks,
       });
 
-      showToast('Contribution submitted successfully! 🚀', 'success');
+      showToast('Contribution submitted successfully.', 'success');
       setTitle('');
       setDescription('');
       setLinkInput('');
       setProofLinks([]);
-      setAttachedFiles([]);
       await loadContributions();
     } catch (err: any) {
-      showToast(err?.message || 'Failed to submit contribution', 'error');
+      showToast(err?.message || 'Failed to submit contribution.', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!user) return;
-    if (!window.confirm('Are you sure you want to delete this pending contribution?')) return;
-
+  const confirmDelete = async () => {
+    if (!user || pendingDeleteId === null) return;
+    setIsDeleting(true);
     try {
-      await ContributionService.deleteContribution(id, user.id);
+      await ContributionService.deleteContribution(pendingDeleteId, user.id);
       showToast('Contribution deleted.', 'info');
+      setPendingDeleteId(null);
       loadContributions();
     } catch (e: any) {
       showToast(e?.message || 'Could not delete contribution.', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -177,7 +148,7 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
   });
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+    <div className="space-y-5">
       {/* Top Header Card */}
       <div className="surface-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -196,10 +167,10 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] text-xs font-bold font-mono">
-            {contributions.filter((c) => c.status === 'CONFIRMED').length || 2} Verified
+            {contributions.filter((c) => c.status === 'CONFIRMED').length} Verified
           </span>
           <span className="px-2.5 py-1 rounded-md bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] text-xs font-bold font-mono">
-            {contributions.filter((c) => c.status === 'PENDING').length || 1} Pending
+            {contributions.filter((c) => c.status === 'PENDING').length} Pending
           </span>
         </div>
       </div>
@@ -281,66 +252,12 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveLink(idx)}
-                        className="hover:text-rose-600 font-bold ml-0.5"
+                        aria-label="Remove link"
+                        className="hover:text-rose-600 ml-0.5"
                       >
-                        ✕
+                        <X className="w-3 h-3" />
                       </button>
                     </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Proof Files Attachment */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-slate-700">Proof Files &amp; Screenshots</label>
-                <button
-                  type="button"
-                  onClick={handleAttachSampleFile}
-                  className="text-[11px] font-semibold text-[#1D63ED] hover:underline"
-                >
-                  + Sample Proof
-                </button>
-              </div>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                multiple
-                className="hidden"
-              />
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-2.5 px-3 rounded-lg border border-dashed border-[#D6E4EE] bg-slate-50 hover:bg-[#EFF6FF]/40 text-xs font-semibold text-slate-600 flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Paperclip className="w-3.5 h-3.5" />
-                <span>Upload Files or Screenshots</span>
-              </button>
-
-              {attachedFiles.length > 0 && (
-                <div className="space-y-1.5 mt-2">
-                  {attachedFiles.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2 rounded-lg border border-[#D6E4EE] bg-white flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <FileText className="w-3.5 h-3.5 text-[#1D63ED] shrink-0" />
-                        <span className="truncate font-mono">{file.name}</span>
-                        <span className="text-slate-400 font-mono text-[10px]">({file.size})</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(idx)}
-                        className="text-slate-400 hover:text-rose-600 font-bold ml-2"
-                      >
-                        ✕
-                      </button>
-                    </div>
                   ))}
                 </div>
               )}
@@ -352,7 +269,7 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
               className="w-full h-9 rounded-lg bg-[#0F4C81] hover:bg-[#1D63ED] text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Submit Contribution for Review 🚀</span>
+              <span>Submit Contribution for Review</span>
             </button>
           </form>
         </div>
@@ -412,7 +329,7 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
 
           {filteredContributions.length === 0 ? (
             <div className="p-12 text-center text-slate-400 space-y-1">
-              <Sparkles className="w-8 h-8 mx-auto text-slate-300" />
+              <FileText className="w-8 h-8 mx-auto text-slate-300" />
               <p className="text-xs font-semibold text-slate-600">No contributions found for this filter</p>
             </div>
           ) : (
@@ -446,13 +363,14 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
                       </div>
 
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold font-mono shrink-0 ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono shrink-0 ${
                           isConfirmed
                             ? 'bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0]'
                             : 'bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]'
                         }`}
                       >
-                        {isConfirmed ? 'Verified ✓' : 'Pending Review'}
+                        {isConfirmed && <CheckCircle2 className="w-3 h-3" />}
+                        {isConfirmed ? 'Verified' : 'Pending Review'}
                       </span>
                     </div>
 
@@ -480,6 +398,18 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
                         ))}
                       </div>
                     )}
+
+                    {isMine && !isConfirmed && (
+                      <div className="pt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteId(c.id)}
+                          className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                        >
+                          Delete Pending Submission
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -487,6 +417,37 @@ export const MyContributionsScreen: React.FC<MyContributionsScreenProps> = ({
           )}
         </div>
       </div>
+
+      <Modal
+        isOpen={pendingDeleteId !== null}
+        onClose={() => !isDeleting && setPendingDeleteId(null)}
+        title="Delete Pending Contribution"
+        maxWidth={440}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setPendingDeleteId(null)}
+              disabled={isDeleting}
+              className="btn btn-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="btn btn-danger btn-sm"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </>
+        }
+      >
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Are you sure you want to delete this pending contribution? This action cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 };

@@ -149,7 +149,7 @@ export const LeaderVotesScreen: React.FC = () => {
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <h3 style={{ fontSize: 16, fontWeight: 850, color: '#102F48', margin: 0 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 800, color: '#102F48', margin: 0 }}>
                           {c.title}
                         </h3>
                         <span className="badge badge-lead">TEAM LEAD WORK</span>

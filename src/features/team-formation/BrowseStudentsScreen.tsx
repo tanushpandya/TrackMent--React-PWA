@@ -122,7 +122,7 @@ export const BrowseStudentsScreen: React.FC = () => {
     setActingStudentId(studentId);
     try {
       await TeamService.sendTeamInvitation(team.id, studentId);
-      showToast('Invitation dispatched to candidate! 📨', 'success');
+      showToast('Invitation dispatched to candidate.', 'success');
       await loadStudents();
     } catch (e: any) {
       showToast(e?.message || 'Failed to send invitation.', 'error');

@@ -124,7 +124,7 @@ export const StudentLedgerScreen: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-xs text-slate-400 font-mono">
-                    Signed by {mentor?.fullName || 'Prof. Dr. Badarinath K B'}
+                    Signed by {mentor?.fullName || 'Faculty Mentor'}
                   </span>
                 </div>
 

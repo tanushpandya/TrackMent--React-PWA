@@ -84,7 +84,7 @@ export class FeedbackService {
         mentor_id: params.mentorId,
         contribution_id: params.contributionId,
         feedback_type: 'THUMBS_UP',
-        content: 'Acknowledged contribution deliverable 👍',
+        content: 'Acknowledged contribution deliverable.',
       });
       if (insErr) throw insErr;
       fastCache.invalidate(`feedback_${params.teamId}`);
@@ -148,7 +148,7 @@ export class FeedbackService {
   }): Promise<number> {
     if (params.teamIds.length === 0) return 0;
     const categoryTag = params.category ? `[${params.category.toUpperCase()}] ` : '';
-    const formattedContent = `📢 ${categoryTag}${params.subject.trim()}\n\n${params.message.trim()}`;
+    const formattedContent = `${categoryTag}${params.subject.trim()}\n\n${params.message.trim()}`;
 
     // QA-003 Fix: Use 'COMMENT' to satisfy SQL check constraint IN ('COMMENT', 'THUMBS_UP', 'MEET_ME')
     const rows = params.teamIds.map((teamId) => ({
@@ -170,7 +170,7 @@ export class FeedbackService {
       await supabase.functions.invoke('send-team-notification', {
         body: {
           teamIds: params.teamIds,
-          subject: `📢 [TrackMent Broadcast] ${params.subject}`,
+          subject: `[TrackMent Broadcast] ${params.subject}`,
           message: params.message,
         },
       });

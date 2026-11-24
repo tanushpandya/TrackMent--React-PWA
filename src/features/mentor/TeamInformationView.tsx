@@ -171,7 +171,7 @@ export const TeamInformationView: React.FC = () => {
         directiveType: newDirectiveType,
       });
 
-      showToast('Directive sent to team lead and roster! 📢', 'success');
+      showToast('Directive sent to team lead and roster.', 'success');
       setNewDirectiveText('');
       const updated = await FeedbackService.fetchTeamFeedback(team.id);
       setFeedbackList(updated);

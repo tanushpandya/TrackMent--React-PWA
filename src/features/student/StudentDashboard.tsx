@@ -139,7 +139,7 @@ export const StudentDashboard: React.FC = () => {
   const mentorName = mentor?.fullName || 'Assigned Faculty Mentor';
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+    <div className="space-y-5">
       {/* Interactive Companion Mood Orb Banner */}
       <MascotCompanionBanner
         mentorName={mentorName}
@@ -148,7 +148,7 @@ export const StudentDashboard: React.FC = () => {
             ? `Your mentor requested an urgent review: "${activeSummons.content || 'Consultation requested'}"`
             : upcomingMeeting
             ? `Upcoming meeting with ${mentorName} on ${meetingDateStr}`
-            : `All milestones aligned. Keep pushing forward with your team! ✨`
+            : `All milestones aligned. Keep pushing forward with your team.`
         }
         subtitle="Your friendly project companion is cheering you on."
         actionText="+ Submit Proof"
@@ -470,7 +470,7 @@ export const StudentDashboard: React.FC = () => {
                   className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-white hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
                 >
                   <div>
-                    <div className="text-xs font-bold text-[#0A2540]">📝 Review Submissions</div>
+                    <div className="text-xs font-bold text-[#0A2540]">Review Submissions</div>
                     <div className="text-[11px] text-slate-500">
                       {displayContributions.filter(c => c.status !== 'CONFIRMED' && (c.status as string) !== 'Verified').length} pending peer submissions
                     </div>
@@ -483,7 +483,7 @@ export const StudentDashboard: React.FC = () => {
                   className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-white hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
                 >
                   <div>
-                    <div className="text-xs font-bold text-[#0A2540]">📥 Join Requests</div>
+                    <div className="text-xs font-bold text-[#0A2540]">Join Requests</div>
                     <div className="text-[11px] text-slate-500">{joinRequests.length} student application(s)</div>
                   </div>
                   <span className="px-2 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] font-mono text-[11px] font-bold">
@@ -496,7 +496,7 @@ export const StudentDashboard: React.FC = () => {
                   className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-white hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
                 >
                   <div>
-                    <div className="text-xs font-bold text-[#0A2540]">👥 Invite Candidates</div>
+                    <div className="text-xs font-bold text-[#0A2540]">Invite Candidates</div>
                     <div className="text-[11px] text-slate-500">Discover &amp; recruit engineering peers</div>
                   </div>
                   <span className="text-xs font-bold text-[#1D63ED]">Browse →</span>
@@ -533,7 +533,7 @@ export const StudentDashboard: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-slate-50/70 hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
               >
                 <div>
-                  <div className="text-xs font-bold text-[#0A2540]">👥 View Team Workspace</div>
+                  <div className="text-xs font-bold text-[#0A2540]">View Team Workspace</div>
                   <div className="text-[11px] text-slate-500">Deliverables, checklist &amp; marks</div>
                 </div>
                 <span className="text-xs font-bold text-[#1D63ED]">Open →</span>
@@ -544,7 +544,7 @@ export const StudentDashboard: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-slate-50/70 hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
               >
                 <div>
-                  <div className="text-xs font-bold text-[#0A2540]">✨ Add Contribution</div>
+                  <div className="text-xs font-bold text-[#0A2540]">Add Contribution</div>
                   <div className="text-[11px] text-slate-500">Submit proofs &amp; code links</div>
                 </div>
                 <span className="text-xs font-bold text-[#1D63ED]">Studio →</span>
@@ -555,7 +555,7 @@ export const StudentDashboard: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-slate-50/70 hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
               >
                 <div>
-                  <div className="text-xs font-bold text-[#0A2540]">📋 Official Entry Ledger</div>
+                  <div className="text-xs font-bold text-[#0A2540]">Official Entry Ledger</div>
                   <div className="text-[11px] text-slate-500">Verified consultation attendance</div>
                 </div>
                 <span className="text-xs font-bold text-[#1D63ED]">Logs →</span>

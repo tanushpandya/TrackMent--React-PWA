@@ -222,12 +222,19 @@ export const QueueMonitorScreen: React.FC = () => {
       <div className="surface-card rounded-xl p-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-10 h-10 rounded-xl bg-[#0A2540] text-white text-sm font-bold flex items-center justify-center shrink-0 font-mono">
-            DB
+            {(profile?.fullName || 'FM')
+              .trim()
+              .split(/\s+/)
+              .map((p) => p[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()}
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-[15px] font-bold text-[#0A2540]">
-                {profile?.fullName || 'Dr. Badarinath K B'} — Computer Science and Engineering • RVCE
+                {profile?.fullName || 'Faculty Mentor'}
+                {profile?.department ? ` — ${profile.department}` : ''}
               </h1>
               <button
                 type="button"

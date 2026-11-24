@@ -84,7 +84,7 @@ export const ReviewContributionsScreen: React.FC = () => {
 
       showToast(
         verdict === 'CONFIRMED'
-          ? 'Deliverable accepted and verified! 🎉'
+          ? 'Deliverable accepted and verified.'
           : 'Update request submitted to teammate.',
         'success'
       );

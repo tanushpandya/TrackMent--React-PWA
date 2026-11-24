@@ -267,7 +267,7 @@ export const UserManualScreen: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <h4 style={{ fontSize: 15, fontWeight: 850, color: '#102F48', margin: 0 }}>
+                    <h4 style={{ fontSize: 15, fontWeight: 800, color: '#102F48', margin: 0 }}>
                       Phase 1: Synopsis & Formulation
                     </h4>
                     <span className="badge badge-confirmed">Max 40 Marks</span>
@@ -309,7 +309,7 @@ export const UserManualScreen: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <h4 style={{ fontSize: 15, fontWeight: 850, color: '#102F48', margin: 0 }}>
+                    <h4 style={{ fontSize: 15, fontWeight: 800, color: '#102F48', margin: 0 }}>
                       Phase 2: Milestone Review
                     </h4>
                     <span className="badge badge-blue">Max 60 Marks</span>
@@ -351,7 +351,7 @@ export const UserManualScreen: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <h4 style={{ fontSize: 15, fontWeight: 850, color: '#102F48', margin: 0 }}>
+                    <h4 style={{ fontSize: 15, fontWeight: 800, color: '#102F48', margin: 0 }}>
                       Phase 3: Final Demo & Evaluation
                     </h4>
                     <span className="badge badge-lead">Max 100 Marks</span>

@@ -138,15 +138,12 @@ export const HomeScreen: React.FC = () => {
       <header className="sticky top-0 z-40 frosted-chrome border-b border-[#D6E4EE]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to="/home" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl brand-mark text-white flex items-center justify-center font-bold text-sm shadow-sm">
-              TM
-            </div>
-            <div>
-              <span className="text-base font-extrabold tracking-tight text-[#0A2540]">TrackMent</span>
-              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D63ED] border border-[#BFDBFE] text-[10px] font-bold uppercase tracking-wider">
-                RVCE PWA
-              </span>
-            </div>
+            <img
+              src="/images/trackment_logo.png"
+              alt="TrackMent"
+              className="w-9 h-9 rounded-xl object-contain shadow-sm"
+            />
+            <span className="text-base font-extrabold tracking-tight text-[#0A2540]">TrackMent</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600">
@@ -190,7 +187,7 @@ export const HomeScreen: React.FC = () => {
         <section className="surface-card rounded-2xl p-6 sm:p-10 text-center space-y-5 relative overflow-hidden">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D63ED] text-xs font-bold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Academic Project Mentorship &amp; CIE Tracking</span>
+            <span>Academic Project Mentorship</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#0A2540] max-w-3xl mx-auto leading-tight">
@@ -209,7 +206,7 @@ export const HomeScreen: React.FC = () => {
               onClick={() => navigate(user ? dashboardRoute : '/login')}
               className="h-11 px-6 rounded-xl bg-[#1D63ED] hover:bg-[#1752C9] text-white text-sm font-bold inline-flex items-center gap-2 transition-colors shadow-sm"
             >
-              <span>{user ? 'Go to My Dashboard' : 'Sign In with @rvce.edu.in'}</span>
+              <span>{user ? 'Go to My Dashboard' : 'Sign In with College Mail'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <Link

@@ -147,7 +147,7 @@ export const LeadDashboard: React.FC = () => {
   const mentorName = mentor?.fullName || 'Assigned Faculty Mentor';
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+    <div className="space-y-5">
       {/* Interactive Companion Mood Orb Banner */}
       <MascotCompanionBanner
         mentorName={mentorName}
@@ -156,7 +156,7 @@ export const LeadDashboard: React.FC = () => {
             ? `Your mentor requested an urgent review: "${activeSummons.content || 'Consultation requested'}"`
             : upcomingMeeting
             ? `Upcoming meeting with ${mentorName} on ${meetingDateStr}`
-            : `All milestones aligned. Keep pushing forward with your team! ✨`
+            : `All milestones aligned. Keep pushing forward with your team.`
         }
         subtitle="Your friendly project companion is cheering you on."
         actionText="+ Submit Proof"
@@ -439,7 +439,7 @@ export const LeadDashboard: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-slate-50/70 hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
               >
                 <div>
-                  <div className="text-xs font-bold text-[#0A2540]">📅 Schedule Mentor Meeting</div>
+                  <div className="text-xs font-bold text-[#0A2540]">Schedule Mentor Meeting</div>
                   <div className="text-[11px] text-slate-500">Book 30-min consultation slot</div>
                 </div>
                 <span className="text-xs font-bold text-[#1D63ED]">Open →</span>
@@ -450,7 +450,7 @@ export const LeadDashboard: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-slate-50/70 hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
               >
                 <div>
-                  <div className="text-xs font-bold text-[#0A2540]">👥 Invite Candidates</div>
+                  <div className="text-xs font-bold text-[#0A2540]">Invite Candidates</div>
                   <div className="text-[11px] text-slate-500">Engineering candidates pool</div>
                 </div>
                 <span className="text-xs font-bold text-[#1D63ED]">Browse →</span>
@@ -461,7 +461,7 @@ export const LeadDashboard: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#D6E4EE] hover:border-[#1D63ED] bg-slate-50/70 hover:bg-[#EFF6FF]/50 flex items-center justify-between text-left transition-colors"
               >
                 <div>
-                  <div className="text-xs font-bold text-[#0A2540]">📥 Review Join Requests</div>
+                  <div className="text-xs font-bold text-[#0A2540]">Review Join Requests</div>
                   <div className="text-[11px] text-slate-500">
                     {joinRequests.length} pending student request(s)
                   </div>

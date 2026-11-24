@@ -83,7 +83,8 @@ export const TeamInfoScreen: React.FC = () => {
   }, [loadExtras]);
 
   const copyCode = async () => {
-    const code = team?.teamCode || 'TM-7JNTN';
+    const code = team?.teamCode;
+    if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
       setCopiedCode(true);
@@ -106,7 +107,7 @@ export const TeamInfoScreen: React.FC = () => {
       });
       await refreshTeam();
       setIsEditingName(false);
-      showToast(`Team name updated to ${teamNameDraft}! ✨`, 'success');
+      showToast(`Team name updated to ${teamNameDraft}.`, 'success');
     } catch (err: any) {
       showToast(err?.message || 'Failed to update team name', 'error');
     }
@@ -126,7 +127,7 @@ export const TeamInfoScreen: React.FC = () => {
       });
       await refreshTeam();
       setIsEditAbstractOpen(false);
-      showToast('Project abstract updated successfully! ✨', 'success');
+      showToast('Project abstract updated successfully.', 'success');
     } catch (err: any) {
       showToast(err?.message || 'Failed to update abstract', 'error');
     } finally {
@@ -153,7 +154,7 @@ export const TeamInfoScreen: React.FC = () => {
     if (!team || !user) return;
     try {
       await TeamService.requestLeadTransfer(team.id, user.id, memberId);
-      showToast('Leadership transfer initiated! 👑', 'success');
+      showToast('Leadership transfer initiated.', 'success');
       setIsTransferModalOpen(false);
       await refreshTeam();
     } catch (err: any) {
@@ -184,7 +185,7 @@ export const TeamInfoScreen: React.FC = () => {
   const maxTotal = (p1Eval?.maxMarks || 40) + (p2Eval?.maxMarks || 100) + (p3Eval?.maxMarks || 60);
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+    <div className="space-y-5">
       {/* Top Team Identity & Inline Name Editor Header */}
       <div className="surface-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-2">
@@ -217,24 +218,27 @@ export const TeamInfoScreen: React.FC = () => {
                 </h1>
                 {isLeader && (
                   <button
+                    type="button"
                     onClick={() => setIsEditingName(true)}
                     className="h-7 px-2.5 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] hover:bg-blue-100 text-[#1D63ED] text-xs font-semibold transition-colors"
                   >
-                    ✎ Edit Name
+                    Edit Name
                   </button>
                 )}
               </>
             )}
 
-            <button
-              onClick={copyCode}
-              title="Click to copy team code"
-              className="h-7 px-2.5 rounded-md border border-[#D6E4EE] bg-slate-50 hover:bg-slate-100 font-mono text-xs font-bold text-[#0A2540] inline-flex items-center gap-1.5 transition-colors"
-            >
-              <span>&lt;&gt;</span>
-              <span>{team?.teamCode || 'TM-7JNTN'}</span>
-              {copiedCode ? <Check className="w-3 h-3 text-[#15803D]" /> : <Copy className="w-3 h-3 text-slate-400" />}
-            </button>
+            {Boolean(team?.teamCode) && (
+              <button
+                type="button"
+                onClick={copyCode}
+                title="Click to copy team code"
+                className="h-7 px-2.5 rounded-md border border-[#D6E4EE] bg-slate-50 hover:bg-slate-100 font-mono text-xs font-bold text-[#0A2540] inline-flex items-center gap-1.5 transition-colors"
+              >
+                <span>{team?.teamCode}</span>
+                {copiedCode ? <Check className="w-3 h-3 text-[#15803D]" /> : <Copy className="w-3 h-3 text-slate-400" />}
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
